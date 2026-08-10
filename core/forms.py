@@ -12,11 +12,33 @@ def normalize_identifier(value: str) -> str:
     return re.sub(r'[\s.\-_/]+', '', value)
 
 
+def _identifier_already_exists(identifier: str) -> bool:
+    # Direct lookups cover all new records efficiently.
+    if User.objects.filter(rgm__iexact=identifier).exists() or User.objects.filter(username__iexact=identifier).exists():
+        return True
+    # Compatibility path for users created before RGM normalization was added.
+    for rgm, username in User.objects.filter(is_superuser=False).values_list('rgm', 'username'):
+        if normalize_identifier(rgm or '') == identifier or normalize_identifier(username or '') == identifier:
+            return True
+    return False
+
+
 class RGMAuthenticationForm(AuthenticationForm):
     def clean(self):
-        username = self.cleaned_data.get('username')
-        if username:
-            self.cleaned_data['username'] = normalize_identifier(username)
+        raw_username = (self.cleaned_data.get('username') or '').strip()
+        normalized = normalize_identifier(raw_username)
+        if raw_username:
+            # New accounts are stored normalized. If this direct lookup misses,
+            # preserve compatibility with RGMs saved with punctuation previously.
+            candidate = User.objects.filter(username__iexact=normalized).only('username').first()
+            if candidate is None:
+                candidate = User.objects.filter(username__iexact=raw_username).only('username').first()
+            if candidate is None:
+                for user in User.objects.filter(is_superuser=False).only('username'):
+                    if normalize_identifier(user.username) == normalized:
+                        candidate = user
+                        break
+            self.cleaned_data['username'] = candidate.username if candidate else normalized
         return super().clean()
 
 
@@ -33,7 +55,7 @@ class StudentSignUpForm(UserCreationForm):
         rgm = normalize_identifier(self.cleaned_data['rgm'])
         if not rgm:
             raise forms.ValidationError('Informe um RGM válido.')
-        if User.objects.filter(rgm__iexact=rgm).exists() or User.objects.filter(username__iexact=rgm).exists():
+        if _identifier_already_exists(rgm):
             raise forms.ValidationError('Este RGM já está cadastrado. Se o cadastro anterior foi concluído, tente entrar com sua senha.')
         return rgm
 
