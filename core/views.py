@@ -1,7 +1,10 @@
+import logging
 from collections import defaultdict
 
-from django.contrib.auth import login
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import IntegrityError, OperationalError, connection
 from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -12,15 +15,33 @@ from .forms import StudentSignUpForm
 from .models import ClinicalCase, Encounter, Message, User
 from .services.gemini import concept_hint, evaluate_encounter, patient_reply, preceptor_hint
 
+logger = logging.getLogger(__name__)
+
+
+def _db_is_busy(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return 'database is locked' in text or 'database is busy' in text
+
 
 def signup(request):
     if request.user.is_authenticated:
         return redirect('home')
     form = StudentSignUpForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        user = form.save()
-        login(request, user)
-        return redirect('dashboard')
+        try:
+            form.save()
+        except IntegrityError:
+            form.add_error('rgm', 'Este RGM já foi cadastrado. Tente entrar com a senha criada anteriormente.')
+        except OperationalError as exc:
+            if not _db_is_busy(exc):
+                raise
+            logger.warning('SQLite ocupado durante cadastro.', exc_info=True)
+            form.add_error(None, 'Muitos alunos estão acessando ao mesmo tempo. Tente concluir o cadastro novamente em alguns segundos.')
+        else:
+            # Do not auto-login here. Keeping registration and authentication as
+            # separate requests avoids a partially-successful first access under load.
+            messages.success(request, 'Cadastro concluído. Agora entre com seu RGM e a senha que você criou.')
+            return redirect('login')
     return render(request, 'registration/signup.html', {'form': form})
 
 
@@ -35,11 +56,28 @@ def home(request):
 def dashboard(request):
     if request.user.is_superuser:
         return redirect('professor_dashboard')
-    cards = []
-    for value, label in ClinicalCase.Category.choices:
-        total = ClinicalCase.objects.filter(category=value, active=True).count()
-        completed = Encounter.objects.filter(student=request.user, case__category=value, status=Encounter.Status.COMPLETED).count()
-        cards.append({'value': value, 'label': label, 'total': total, 'completed': completed})
+
+    totals = {
+        row['category']: row['total']
+        for row in ClinicalCase.objects.filter(active=True)
+        .values('category')
+        .annotate(total=Count('id'))
+    }
+    completed = {
+        row['case__category']: row['total']
+        for row in Encounter.objects.filter(student=request.user, status=Encounter.Status.COMPLETED)
+        .values('case__category')
+        .annotate(total=Count('id'))
+    }
+    cards = [
+        {
+            'value': value,
+            'label': label,
+            'total': totals.get(value, 0),
+            'completed': completed.get(value, 0),
+        }
+        for value, label in ClinicalCase.Category.choices
+    ]
     return render(request, 'dashboard.html', {'cards': cards})
 
 
@@ -58,7 +96,12 @@ def category_cases(request, category):
 
 def _student_case(request, case_id):
     case = get_object_or_404(ClinicalCase, id=case_id, active=True)
-    encounter, created = Encounter.objects.get_or_create(student=request.user, case=case)
+    try:
+        encounter, created = Encounter.objects.get_or_create(student=request.user, case=case)
+    except IntegrityError:
+        # A second near-simultaneous request may lose the get_or_create race.
+        encounter = Encounter.objects.get(student=request.user, case=case)
+        created = False
     if created:
         Message.objects.create(encounter=encounter, role=Message.Role.PATIENT, content=case.complaint)
     return case, encounter
@@ -79,20 +122,53 @@ def case_chat(request, case_id):
 def send_message(request, case_id):
     if request.user.is_superuser:
         return JsonResponse({'error': 'Ação indisponível.'}, status=403)
-    case, encounter = _student_case(request, case_id)
-    if encounter.status == Encounter.Status.COMPLETED:
-        return JsonResponse({'error': 'Este atendimento já foi concluído.'}, status=400)
-    content = (request.POST.get('message') or '').strip()
-    if not content:
-        return JsonResponse({'error': 'Digite uma mensagem.'}, status=400)
-    Message.objects.create(encounter=encounter, role=Message.Role.STUDENT, content=content)
+
+    try:
+        case, encounter = _student_case(request, case_id)
+        if encounter.status == Encounter.Status.COMPLETED:
+            return JsonResponse({'error': 'Este atendimento já foi concluído.'}, status=400)
+        content = (request.POST.get('message') or '').strip()
+        if not content:
+            return JsonResponse({'error': 'Digite uma mensagem.'}, status=400)
+        student_entry = Message.objects.create(encounter=encounter, role=Message.Role.STUDENT, content=content)
+    except OperationalError as exc:
+        if not _db_is_busy(exc):
+            raise
+        logger.warning('SQLite ocupado antes da chamada Gemini.', exc_info=True)
+        return JsonResponse(
+            {'error': 'A plataforma está processando muitos atendimentos simultâneos. Tente enviar novamente em alguns segundos.', 'retryable': True},
+            status=503,
+        )
+
     result = patient_reply(encounter, content)
+    if result.get('_service_unavailable'):
+        # Do not poison the transcript with an API-error message. The front-end
+        # restores the student's text so it can be sent again.
+        try:
+            student_entry.delete()
+        except OperationalError:
+            logger.warning('Não foi possível remover mensagem pendente após falha Gemini.', exc_info=True)
+        return JsonResponse(
+            {'error': 'O paciente virtual está atendendo muitos alunos neste momento. Tente enviar novamente em alguns segundos.', 'retryable': True},
+            status=503,
+        )
+
     reply = (result.get('reply') or '').strip()
-    Message.objects.create(encounter=encounter, role=Message.Role.PATIENT, content=reply)
     assessment = result.get('treatment_assessment')
-    if result.get('is_treatment') and assessment in {'ADEQUATE', 'PARTIAL', 'INADEQUATE'}:
-        encounter.outcome = assessment
-        encounter.save(update_fields=['outcome', 'updated_at'])
+    try:
+        Message.objects.create(encounter=encounter, role=Message.Role.PATIENT, content=reply)
+        if result.get('is_treatment') and assessment in {'ADEQUATE', 'PARTIAL', 'INADEQUATE'}:
+            encounter.outcome = assessment
+            encounter.save(update_fields=['outcome', 'updated_at'])
+    except OperationalError as exc:
+        if not _db_is_busy(exc):
+            raise
+        logger.warning('SQLite ocupado ao persistir resposta Gemini.', exc_info=True)
+        return JsonResponse(
+            {'error': 'A resposta foi gerada, mas o servidor está muito ocupado para registrá-la. Tente novamente em alguns segundos.', 'retryable': True},
+            status=503,
+        )
+
     return JsonResponse({'reply': reply, 'assessment': assessment})
 
 
@@ -130,6 +206,10 @@ def conclude_case(request, case_id):
     _, encounter = _student_case(request, case_id)
     if encounter.status != Encounter.Status.COMPLETED:
         feedback = evaluate_encounter(encounter)
+        if feedback.pop('_service_unavailable', False):
+            messages.error(request, 'A avaliação está temporariamente congestionada. Seu atendimento foi preservado; tente concluir novamente em alguns segundos.')
+            return redirect('case_chat', case_id=case_id)
+        feedback.pop('_model_used', None)
         encounter.final_feedback = feedback
         encounter.score = max(0, min(100, int(feedback.get('score', 0))))
         encounter.status = Encounter.Status.COMPLETED
@@ -189,4 +269,20 @@ def professor_student(request, user_id):
 
 
 def healthz(request):
-    return JsonResponse({'status': 'ok'})
+    try:
+        User.objects.only('pk').first()
+        database_status = 'ok'
+        status = 200
+    except Exception:
+        logger.exception('Health check: banco indisponível.')
+        database_status = 'error'
+        status = 503
+    return JsonResponse(
+        {
+            'status': 'ok' if status == 200 else 'degraded',
+            'database': database_status,
+            'database_backend': connection.vendor,
+            'ai_configured': bool(settings.GEMINI_API_KEY),
+        },
+        status=status,
+    )
