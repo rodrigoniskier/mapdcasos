@@ -27,10 +27,10 @@
     <div class="tool-card"><p class="eyebrow">APOIO AO RACIOCÍNIO</p><h2>Ferramentas</h2><p>Use quando precisar de uma pista. Elas ficam registradas no atendimento.</p></div>
     <button id="preceptor-btn" class="btn btn-secondary tool-btn" data-url="{% url 'ask_preceptor' case.id %}">🩺 Pedir conselho ao preceptor</button>
     <button id="concept-btn" class="btn btn-secondary tool-btn" data-url="{% url 'remember_concept' case.id %}">🧠 Lembre o conceito</button>
-    <form method="post" action="{% url 'conclude_case' case.id %}" onsubmit="return confirm('Concluir o atendimento e solicitar a avaliação do preceptor?');">
-      {% csrf_token %}<button class="btn btn-finish" type="submit">✓ Concluir atendimento / Avaliação</button>
+    <form id="finish-form" method="post" action="{% url 'conclude_case' case.id %}">
+      {% csrf_token %}<button id="finish-btn" class="btn btn-finish" type="submit">✓ Concluir atendimento / Avaliação</button>
     </form>
-    <div class="privacy-note">O paciente virtual conhece uma ficha-mestra oculta e não deve revelar o diagnóstico antes da conclusão.</div>
+    <div class="privacy-note">O paciente virtual conhece uma ficha-mestra oculta e não deve revelar o diagnóstico antes da conclusão. Não inclua dados pessoais reais na conversa.</div>
   </aside>
 </div>
 {% endblock %}
@@ -39,6 +39,19 @@
 const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
 const messagesBox = document.getElementById('messages');
 const input = document.getElementById('message-input');
+const chatForm = document.getElementById('chat-form');
+const preceptorBtn = document.getElementById('preceptor-btn');
+const conceptBtn = document.getElementById('concept-btn');
+const finishForm = document.getElementById('finish-form');
+const finishBtn = document.getElementById('finish-btn');
+
+function requestId(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8); return v.toString(16);
+  });
+}
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
 function scrollBottom(){ messagesBox.scrollTop = messagesBox.scrollHeight; }
 function addBubble(role, label, text){
   const article = document.createElement('article'); article.className = 'bubble ' + role;
@@ -47,38 +60,117 @@ function addBubble(role, label, text){
   article.append(small, div); messagesBox.appendChild(article); scrollBottom();
   return article;
 }
+function updateBubble(article, label, text){
+  if(!article) return;
+  article.querySelector('small').textContent = label;
+  article.querySelector('div').textContent = text;
+  scrollBottom();
+}
+function setBusy(busy){
+  chatForm.querySelector('button').disabled = busy;
+  input.disabled = busy;
+  preceptorBtn.disabled = busy;
+  conceptBtn.disabled = busy;
+  finishBtn.disabled = busy;
+}
 async function postForm(url, data={}){
   const form = new FormData(); form.append('csrfmiddlewaretoken', csrf);
   Object.entries(data).forEach(([k,v]) => form.append(k,v));
-  const r = await fetch(url, {method:'POST', body:form, headers:{'X-Requested-With':'XMLHttpRequest'}});
+  const response = await fetch(url, {
+    method:'POST', body:form,
+    headers:{'X-Requested-With':'XMLHttpRequest', 'X-Request-ID':data.request_id || requestId()}
+  });
   let payload = {};
-  try { payload = await r.json(); } catch (_) {}
-  if(!r.ok) throw new Error(payload.error || 'Falha temporária na solicitação. Tente novamente.');
+  try { payload = await response.json(); } catch (_) {}
+  if(!response.ok){
+    const error = new Error(payload.error || 'Falha temporária na solicitação. Tente novamente.');
+    error.retryable = Boolean(payload.retryable);
+    error.retryAfter = Number(payload.retry_after || 0);
+    throw error;
+  }
   return payload;
 }
-document.getElementById('chat-form').addEventListener('submit', async (e)=>{
-  e.preventDefault(); const text = input.value.trim(); if(!text) return;
-  const btn = e.currentTarget.querySelector('button'); btn.disabled=true; input.disabled=true;
-  const pendingBubble = addBubble('student','Aluno',text); input.value='';
-  try {
-    const data = await postForm(e.currentTarget.action,{message:text});
-    addBubble('patient','Paciente',data.reply);
+async function getJob(url){
+  const response = await fetch(url, {headers:{'X-Requested-With':'XMLHttpRequest'}});
+  let payload = {};
+  try { payload = await response.json(); } catch (_) {}
+  if(!response.ok && response.status !== 202){
+    throw new Error(payload.error || 'Não foi possível consultar o processamento.');
   }
-  catch(err){
-    pendingBubble.remove();
+  return payload;
+}
+async function consumeJob(payload, pendingBubble){
+  let delay = 700;
+  let current = payload;
+  while(current.status === 'processing'){
+    updateBubble(pendingBubble, 'Sistema', 'Processando com segurança…');
+    await sleep(delay);
+    current = await getJob(current.status_url);
+    delay = Math.min(2500, Math.round(delay * 1.45));
+  }
+  if(current.status === 'completed'){
+    if(current.redirect_url){ window.location.assign(current.redirect_url); return current; }
+    if(pendingBubble) pendingBubble.remove();
+    addBubble(current.role || 'system', current.label || 'Sistema', current.reply || 'Concluído.');
+    return current;
+  }
+  if(pendingBubble) pendingBubble.remove();
+  const error = new Error(current.error || 'A solicitação não pôde ser concluída.');
+  error.retryable = Boolean(current.retryable);
+  throw error;
+}
+async function runQueuedAction(url, data, pendingText){
+  const pendingBubble = addBubble('system','Sistema',pendingText);
+  const payload = await postForm(url, data);
+  return consumeJob(payload, pendingBubble);
+}
+
+chatForm.addEventListener('submit', async (event)=>{
+  event.preventDefault();
+  const text = input.value.trim(); if(!text) return;
+  setBusy(true);
+  const studentBubble = addBubble('student','Aluno',text);
+  input.value='';
+  try {
+    await runQueuedAction(chatForm.action,{message:text, request_id:requestId()},'Paciente preparando a resposta…');
+  } catch(err){
+    studentBubble.remove();
     input.value = text;
     addBubble('system','Sistema',err.message);
+  } finally {
+    setBusy(false); input.disabled=false; input.focus();
   }
-  finally { btn.disabled=false; input.disabled=false; input.focus(); }
 });
-async function toolClick(buttonId, role, label){
-  const btn=document.getElementById(buttonId); btn.disabled=true;
-  try { const data=await postForm(btn.dataset.url); addBubble(role,label,data.reply); }
-  catch(err){ addBubble('system','Sistema',err.message); }
-  finally { btn.disabled=false; }
+
+async function toolClick(button, pendingText){
+  setBusy(true);
+  try {
+    await runQueuedAction(button.dataset.url,{request_id:requestId()},pendingText);
+  } catch(err){ addBubble('system','Sistema',err.message); }
+  finally { setBusy(false); input.focus(); }
 }
-document.getElementById('preceptor-btn').addEventListener('click',()=>toolClick('preceptor-btn','preceptor','Preceptor'));
-document.getElementById('concept-btn').addEventListener('click',()=>toolClick('concept-btn','tutor','Lembre o conceito'));
+preceptorBtn.addEventListener('click',()=>toolClick(preceptorBtn,'Preceptor analisando o atendimento…'));
+conceptBtn.addEventListener('click',()=>toolClick(conceptBtn,'Tutor selecionando uma pista conceitual…'));
+
+finishForm.addEventListener('submit', async (event)=>{
+  event.preventDefault();
+  if(!confirm('Concluir o atendimento e solicitar a avaliação do preceptor?')) return;
+  setBusy(true);
+  try {
+    await runQueuedAction(finishForm.action,{request_id:requestId()},'Preceptor avaliando o atendimento…');
+  } catch(err){
+    addBubble('system','Sistema',err.message);
+    setBusy(false);
+  }
+});
+
 scrollBottom();
+{% if pending_job %}
+setBusy(true);
+const resumed = addBubble('system','Sistema','Retomando uma solicitação em processamento…');
+consumeJob({status:'processing', status_url:'{% url "ai_job_status" pending_job.request_id %}'}, resumed)
+  .catch(err => addBubble('system','Sistema',err.message))
+  .finally(() => { setBusy(false); input.focus(); });
+{% endif %}
 </script>
 {% endblock %}
