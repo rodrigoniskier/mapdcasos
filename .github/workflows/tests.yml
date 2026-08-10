@@ -33,3 +33,19 @@ jobs:
           DJANGO_SECRET_KEY: ci-only-secret-key
           DJANGO_DEBUG: 'True'
         run: python manage.py test
+      - name: Run tests with production security settings
+        env:
+          APP_ENV: production
+          DJANGO_SECRET_KEY: ci-production-like-secret-key
+          DJANGO_DEBUG: 'False'
+          DJANGO_SECURE_SSL_REDIRECT: 'True'
+          DJANGO_ALLOWED_HOSTS: 'testserver,localhost,127.0.0.1'
+        run: python manage.py test
+      - name: Production deployment checks
+        env:
+          APP_ENV: production
+          DJANGO_SECRET_KEY: ci-production-like-secret-key
+          DJANGO_DEBUG: 'False'
+          DJANGO_SECURE_SSL_REDIRECT: 'True'
+          DJANGO_ALLOWED_HOSTS: 'testserver,localhost,127.0.0.1'
+        run: python manage.py check --deploy
