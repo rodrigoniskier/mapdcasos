@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -13,6 +14,11 @@ class User(AbstractUser):
 
     def save(self, *args, **kwargs):
         if self.is_superuser:
+            other_superusers = type(self).objects.filter(is_superuser=True)
+            if self.pk:
+                other_superusers = other_superusers.exclude(pk=self.pk)
+            if other_superusers.exists():
+                raise ValidationError('O MAPD Casos permite apenas um superusuário.')
             self.role = self.Role.PROFESSOR
         super().save(*args, **kwargs)
 
