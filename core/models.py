@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -81,6 +83,10 @@ class Encounter(models.Model):
     outcome = models.CharField(max_length=16, choices=Outcome.choices, default=Outcome.NOT_ASSESSED)
     score = models.PositiveSmallIntegerField(null=True, blank=True)
     final_feedback = models.JSONField(default=dict, blank=True)
+    # Gemini Interactions server-side state: only the provider interaction ID is stored locally.
+    # Student identity/RGM is never sent as model context.
+    patient_interaction_id = models.CharField(max_length=512, blank=True)
+    patient_interaction_model = models.CharField(max_length=80, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -111,3 +117,56 @@ class Message(models.Model):
 
     def __str__(self):
         return f'{self.get_role_display()}: {self.content[:50]}'
+
+
+class AIJob(models.Model):
+    class Kind(models.TextChoices):
+        PATIENT = 'PATIENT', 'Paciente virtual'
+        PRECEPTOR = 'PRECEPTOR', 'Preceptor'
+        CONCEPT = 'CONCEPT', 'Lembre o conceito'
+        EVALUATION = 'EVALUATION', 'Avaliação final'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pendente'
+        RUNNING = 'RUNNING', 'Processando'
+        COMPLETED = 'COMPLETED', 'Concluído'
+        FAILED = 'FAILED', 'Falhou'
+        CANCELLED = 'CANCELLED', 'Cancelado'
+
+    request_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    encounter = models.ForeignKey(Encounter, on_delete=models.CASCADE, related_name='ai_jobs')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_jobs')
+    source_message = models.ForeignKey(
+        Message,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ai_jobs',
+    )
+    kind = models.CharField(max_length=16, choices=Kind.choices, db_index=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
+    input_hash = models.CharField(max_length=64, db_index=True)
+    prompt_version = models.CharField(max_length=64, blank=True)
+    provider_interaction_id = models.CharField(max_length=512, blank=True, db_index=True)
+    model_used = models.CharField(max_length=80, blank=True)
+    fallback_used = models.BooleanField(default=False)
+    repair_attempts = models.PositiveSmallIntegerField(default=0)
+    result = models.JSONField(default=dict, blank=True)
+    error_type = models.CharField(max_length=64, blank=True)
+    error_code = models.CharField(max_length=32, blank=True)
+    # Sanitized technical summary only. Never store secrets or full provider payloads here.
+    error_message = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['student', 'status', 'created_at'], name='aijob_user_status_idx'),
+            models.Index(fields=['encounter', 'kind', 'status'], name='aijob_enc_kind_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.kind} / {self.status} / {self.request_id}'
