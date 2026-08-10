@@ -45,19 +45,30 @@ function addBubble(role, label, text){
   const small = document.createElement('small'); small.textContent = label;
   const div = document.createElement('div'); div.textContent = text;
   article.append(small, div); messagesBox.appendChild(article); scrollBottom();
+  return article;
 }
 async function postForm(url, data={}){
   const form = new FormData(); form.append('csrfmiddlewaretoken', csrf);
   Object.entries(data).forEach(([k,v]) => form.append(k,v));
   const r = await fetch(url, {method:'POST', body:form, headers:{'X-Requested-With':'XMLHttpRequest'}});
-  const payload = await r.json(); if(!r.ok) throw new Error(payload.error || 'Falha na solicitação.'); return payload;
+  let payload = {};
+  try { payload = await r.json(); } catch (_) {}
+  if(!r.ok) throw new Error(payload.error || 'Falha temporária na solicitação. Tente novamente.');
+  return payload;
 }
 document.getElementById('chat-form').addEventListener('submit', async (e)=>{
   e.preventDefault(); const text = input.value.trim(); if(!text) return;
   const btn = e.currentTarget.querySelector('button'); btn.disabled=true; input.disabled=true;
-  addBubble('student','Aluno',text); input.value='';
-  try { const data = await postForm(e.currentTarget.action,{message:text}); addBubble('patient','Paciente',data.reply); }
-  catch(err){ addBubble('system','Sistema',err.message); }
+  const pendingBubble = addBubble('student','Aluno',text); input.value='';
+  try {
+    const data = await postForm(e.currentTarget.action,{message:text});
+    addBubble('patient','Paciente',data.reply);
+  }
+  catch(err){
+    pendingBubble.remove();
+    input.value = text;
+    addBubble('system','Sistema',err.message);
+  }
   finally { btn.disabled=false; input.disabled=false; input.focus(); }
 });
 async function toolClick(buttonId, role, label){
