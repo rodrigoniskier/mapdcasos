@@ -4,7 +4,12 @@ Data: 2026-08-10
 
 ## Estado geral
 
-A aplicação foi submetida ao hardening previsto no Protocolo RN para aplicações web com IA generativa. O código está preparado para operação multiusuário, mas a infraestrutura de produção ainda precisa substituir SQLite por PostgreSQL e, com múltiplos web workers, usar Redis compartilhado.
+A aplicação foi submetida ao hardening previsto no Protocolo RN para aplicações web com IA generativa. Há agora dois níveis operacionais explicitamente separados:
+
+1. **Piloto gratuito controlado** — compatível com a infraestrutura gratuita atual, com 1 worker, SQLite e cache em arquivo, usando limites conservadores e Gemini em background.
+2. **Produção plena multiusuário** — exige banco multiusuário, cache compartilhado, múltiplos web workers e teste de carga compatível com turma real.
+
+Essa separação evita classificar como bug aquilo que é limitação deliberada da hospedagem gratuita.
 
 ## Implementado
 
@@ -27,33 +32,85 @@ A aplicação foi submetida ao hardening previsto no Protocolo RN para aplicaç�
 - Token budget distinto para chat e avaliação.
 - Prompts versionados e separados da entrada do usuário.
 - Histórico/contexto limitado e estado de conversa do provedor reutilizado quando disponível.
+- Execução Gemini em `background=true` para liberar rapidamente o request web.
+- Polling progressivo no frontend para reduzir pressão sobre o único worker.
 - Saída renderizada como texto, sem HTML bruto da IA.
 - Logs com request_id, usuário anonimizado, endpoint, duração e métricas da IA.
 - Health checks de app, banco, IA e fila.
-- Sessão assinada em cookie, compatível com múltiplos workers sem escrita de sessão no banco.
+- Sessão assinada em cookie, sem escrita de sessão no banco.
 - `last_login` desativado para reduzir escrita concorrente.
+- Perfil gratuito automático quando `production + SQLite + sem Redis`.
+- No perfil gratuito: máximo de 1 job/aluno, 20 jobs globais, 8 req/min/aluno, 60 req/min globais e 50 req/min/tipo.
+- Backup SQLite consistente, verificado por `PRAGMA integrity_check` e com retenção rotativa.
+- Manutenção manual para remover AIJobs técnicos antigos, cache descartável e referências remotas expiráveis, preservando histórico clínico.
 - Testes de autenticação, normalização, schema, Error Router, rate limiting e idempotência.
-- Comando `python manage.py production_readiness` para auditoria operacional.
+- CI em três cenários: desenvolvimento, production-like e perfil gratuito operacional.
+- Comando `production_readiness` para produção plena.
+- Comando `free_tier_readiness` para piloto gratuito controlado.
 
-## Pendências de infraestrutura antes de turma real
+## Gate do piloto gratuito
+
+Antes de uso controlado:
+
+```bash
+python manage.py test
+python manage.py free_tier_readiness --strict
+python manage.py backup_sqlite --keep 2
+```
+
+Antes de uma sessão importante, executar:
+
+```bash
+python manage.py free_tier_maintenance
+```
+
+O piloto gratuito é considerado apto quando `free_tier_readiness --strict` passa. SQLite e cache em arquivo aparecem como **limitações declaradas**, não como falhas desse gate.
+
+## Limitações aceitas no piloto gratuito
+
+### SQLite
+
+Aceito somente porque há um único web worker e o fluxo de IA foi retirado do request síncrono longo. Continua inadequado para produção multiworker.
+
+### Cache em arquivo
+
+É suficiente para o único worker atual. Não deve ser usado como mecanismo de coordenação quando houver múltiplos workers.
+
+### Um único web worker
+
+A aplicação reduz trabalho síncrono, usa Gemini em background e polling progressivo. Ainda assim, picos de navegação/login podem formar fila. O piloto deve ser gradual e monitorado.
+
+### Manutenção manual
+
+Sem processo always-on gratuito, backup e limpeza são tarefas operacionais manuais antes de sessões relevantes.
+
+## Pendências para produção plena
 
 ### P1 — PostgreSQL
 
-Não operar turma simultânea sobre SQLite. Configurar `DATABASE_URL` com PostgreSQL e executar migrações.
+Configurar `DATABASE_URL` e migrar os dados para banco multiusuário.
 
 ### P1 — Redis compartilhado
 
-Com múltiplos web workers, configurar `REDIS_URL` para compartilhar rate limiter e circuit breakers entre processos.
+Configurar `REDIS_URL` para rate limiter, circuit breakers e coordenação entre processos.
 
-### P1 — Web workers
+### P1 — Múltiplos web workers
 
-Dimensionar múltiplos workers no provedor de hospedagem. A fila lógica reduz bloqueio, mas o front controller ainda precisa capacidade concorrente para login, dashboard, criação e polling de jobs.
+Dimensionar workers conforme carga real.
 
-### P1 — Teste de carga real
+### P1 — Teste de carga de turma real
 
 Executar jornadas completas em 5, 20, 50 e, se necessário, 100 usuários concorrentes, observando P50/P95/P99, 429, 5xx, tempo de fila, falhas de schema e recuperação.
 
-## Gate recomendado antes da aula
+## Gates
+
+### Piloto gratuito
+
+```bash
+python manage.py free_tier_readiness --strict
+```
+
+### Produção plena
 
 ```bash
 python manage.py check --deploy
@@ -61,4 +118,4 @@ python manage.py production_readiness --strict
 python manage.py test
 ```
 
-Somente liberar para turma quando o gate estrito passar em ambiente de produção e o teste de carga confirmar degradação controlada.
+O gate de produção plena deve continuar falhando enquanto a infraestrutura paga não estiver disponível. Isso é intencional e preserva a definição de pronto do Protocolo RN.
