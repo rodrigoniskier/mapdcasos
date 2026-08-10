@@ -49,3 +49,25 @@ jobs:
           DJANGO_SECURE_SSL_REDIRECT: 'True'
           DJANGO_ALLOWED_HOSTS: 'testserver,localhost,127.0.0.1'
         run: python manage.py check --deploy
+      - name: Free-tier operational gate
+        env:
+          APP_ENV: production
+          DJANGO_SECRET_KEY: ci-free-tier-secret-key
+          DJANGO_DEBUG: 'False'
+          DJANGO_SECURE_SSL_REDIRECT: 'True'
+          DJANGO_ALLOWED_HOSTS: 'testserver,localhost,127.0.0.1'
+          GEMINI_API_KEY: 'ci-placeholder-key'
+          FREE_TIER_PROFILE: 'True'
+          SUPERUSER_USERNAME: 'rodrigo'
+          SUPERUSER_NAME: 'Prof. Rodrigo Niskier'
+          SUPERUSER_PASSWORD: 'CI-SenhaForte-2026!'
+        run: |
+          rm -f db.sqlite3
+          python manage.py migrate --noinput
+          python manage.py seed_cases
+          python manage.py bootstrap_admin
+          python manage.py free_tier_readiness --strict
+          python manage.py backup_sqlite --keep 1
+          python manage.py free_tier_maintenance --skip-backup
+          rm -f db.sqlite3
+          rm -rf backups .django-cache
