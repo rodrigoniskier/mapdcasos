@@ -6,6 +6,9 @@ class CoreConfig(AppConfig):
     name = 'core'
 
     def ready(self):
+        # Register Protocol RN deployment checks.
+        from . import checks  # noqa: F401
+
         # last_login is not used by MAPD Casos. Disabling its signal avoids one
         # database write on every login, which materially reduces SQLite lock
         # contention during classroom access peaks.
