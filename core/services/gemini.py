@@ -1,20 +1,63 @@
 import json
 import logging
+from functools import lru_cache
 from typing import Any
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+_RETRYABLE_HTTP_CODES = [408, 429, 500, 502, 503, 504]
+_PERMANENT_HTTP_CODES = {400, 401, 403}
 
+
+@lru_cache(maxsize=1)
 def _client():
+    """Reuse one SDK client per web worker so HTTP connections are pooled."""
     if not settings.GEMINI_API_KEY:
         return None
+
     from google import genai
-    return genai.Client(api_key=settings.GEMINI_API_KEY)
+    from google.genai import types
+
+    retry_options = types.HttpRetryOptions(
+        attempts=settings.GEMINI_RETRY_ATTEMPTS,
+        initial_delay=0.6,
+        max_delay=4.0,
+        exp_base=2.0,
+        jitter=1.0,
+        http_status_codes=_RETRYABLE_HTTP_CODES,
+    )
+    return genai.Client(
+        api_key=settings.GEMINI_API_KEY,
+        http_options=types.HttpOptions(retry_options=retry_options),
+    )
 
 
-def _transcript(encounter, limit=36):
+def _status_code(exc: Exception) -> int | None:
+    for attr in ('status_code', 'code'):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    response = getattr(exc, 'response', None)
+    value = getattr(response, 'status_code', None)
+    return value if isinstance(value, int) else None
+
+
+def _can_try_fallback(exc: Exception) -> bool:
+    code = _status_code(exc)
+    return code not in _PERMANENT_HTTP_CODES
+
+
+def _model_candidates(primary: str, fallback: str):
+    seen = set()
+    for model in (primary, fallback):
+        if model and model not in seen:
+            seen.add(model)
+            yield model
+
+
+def _transcript(encounter, limit=24):
     messages = list(encounter.messages.all().order_by('-created_at', '-id')[:limit])
     messages.reverse()
     labels = {
@@ -25,6 +68,7 @@ def _transcript(encounter, limit=36):
 
 
 def _case_packet(case):
+    # Compact JSON reduces repeated input tokens on every conversational turn.
     return json.dumps({
         'paciente': {'nome': case.patient_name, 'idade': case.age, 'sexo': case.sex},
         'queixa_inicial': case.complaint,
@@ -34,36 +78,82 @@ def _case_packet(case):
         'conduta_esperada': case.expected_management,
         'sinais_de_alarme': case.red_flags,
         'conceito_ancora': case.concept_anchor,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False, separators=(',', ':'))
 
 
-def _text(prompt: str, fallback: str) -> str:
+def _text(prompt: str, fallback: str, *, primary_model: str, fallback_model: str) -> str:
     client = _client()
     if client is None:
-        return fallback
-    try:
-        interaction = client.interactions.create(model=settings.GEMINI_MODEL, input=prompt)
-        return (interaction.output_text or fallback).strip()
-    except Exception:
-        logger.exception('Erro ao consultar Gemini')
+        logger.error('GEMINI_API_KEY ausente.')
         return fallback
 
+    last_exc = None
+    for model in _model_candidates(primary_model, fallback_model):
+        try:
+            interaction = client.interactions.create(model=model, input=prompt)
+            text = (interaction.output_text or '').strip()
+            if text:
+                return text
+            raise ValueError('Gemini retornou texto vazio.')
+        except Exception as exc:
+            last_exc = exc
+            logger.warning(
+                'Falha Gemini model=%s status=%s type=%s',
+                model, _status_code(exc), type(exc).__name__,
+                exc_info=True,
+            )
+            if not _can_try_fallback(exc):
+                break
 
-def _structured(prompt: str, schema: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
+    if last_exc:
+        logger.error('Todos os modelos Gemini falharam para resposta textual.')
+    return fallback
+
+
+def _structured(
+    prompt: str,
+    schema: dict[str, Any],
+    fallback: dict[str, Any],
+    *,
+    primary_model: str,
+    fallback_model: str,
+) -> dict[str, Any]:
     client = _client()
     if client is None:
-        return fallback
-    try:
-        interaction = client.interactions.create(
-            model=settings.GEMINI_MODEL,
-            input=prompt,
-            response_format={'type': 'text', 'mime_type': 'application/json', 'schema': schema},
-        )
-        data = json.loads(interaction.output_text)
-        return data if isinstance(data, dict) else fallback
-    except Exception:
-        logger.exception('Erro ao consultar Gemini com saída estruturada')
-        return fallback
+        logger.error('GEMINI_API_KEY ausente.')
+        result = dict(fallback)
+        result['_service_unavailable'] = True
+        return result
+
+    for model in _model_candidates(primary_model, fallback_model):
+        try:
+            interaction = client.interactions.create(
+                model=model,
+                input=prompt,
+                response_format={
+                    'type': 'text',
+                    'mime_type': 'application/json',
+                    'schema': schema,
+                },
+            )
+            data = json.loads(interaction.output_text or '')
+            if not isinstance(data, dict):
+                raise ValueError('Saída estruturada não é um objeto JSON.')
+            data['_service_unavailable'] = False
+            data['_model_used'] = model
+            return data
+        except Exception as exc:
+            logger.warning(
+                'Falha Gemini structured model=%s status=%s type=%s',
+                model, _status_code(exc), type(exc).__name__,
+                exc_info=True,
+            )
+            if not _can_try_fallback(exc):
+                break
+
+    result = dict(fallback)
+    result['_service_unavailable'] = True
+    return result
 
 
 def patient_reply(encounter, student_message: str) -> dict[str, Any]:
@@ -105,11 +195,17 @@ Classifique se há tratamento concreto e devolva a fala do paciente.
         'additionalProperties': False,
     }
     fallback = {
-        'reply': 'No momento o paciente virtual não conseguiu responder. Verifique a configuração da API Gemini e tente novamente.',
+        'reply': '',
         'is_treatment': False,
         'treatment_assessment': 'NOT_APPLICABLE',
     }
-    result = _structured(prompt, schema, fallback)
+    result = _structured(
+        prompt,
+        schema,
+        fallback,
+        primary_model=settings.GEMINI_CHAT_MODEL,
+        fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
+    )
     if result.get('treatment_assessment') not in {'NOT_APPLICABLE', 'ADEQUATE', 'PARTIAL', 'INADEQUATE'}:
         result['treatment_assessment'] = 'NOT_APPLICABLE'
     return result
@@ -128,7 +224,12 @@ FICHA-MESTRA:
 CONVERSA:
 {_transcript(encounter)}
 """
-    return _text(prompt, 'Revise o que já foi perguntado e procure identificar qual informação ainda mudaria de forma importante sua hipótese ou sua conduta.')
+    return _text(
+        prompt,
+        'Revise o que já foi perguntado e procure identificar qual informação ainda mudaria de forma importante sua hipótese ou sua conduta.',
+        primary_model=settings.GEMINI_CHAT_MODEL,
+        fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
+    )
 
 
 def concept_hint(encounter) -> str:
@@ -143,7 +244,12 @@ FICHA-MESTRA:
 CONVERSA:
 {_transcript(encounter)}
 """
-    return _text(prompt, 'Pense em qual característica biológica do agente ou da resposta do hospedeiro explicaria os achados que você já identificou.')
+    return _text(
+        prompt,
+        'Pense em qual característica biológica do agente ou da resposta do hospedeiro explicaria os achados que você já identificou.',
+        primary_model=settings.GEMINI_CHAT_MODEL,
+        fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
+    )
 
 
 def evaluate_encounter(encounter) -> dict[str, Any]:
@@ -188,10 +294,16 @@ CONVERSA:
     fallback = {
         'score': 0,
         'case_summary': f'{encounter.case.diagnosis} — {encounter.case.pathogen}.',
-        'care_summary': 'A avaliação automática não pôde ser concluída. Verifique a configuração da API Gemini.',
+        'care_summary': 'A avaliação automática está temporariamente indisponível.',
         'strengths': [],
-        'reinforcement': ['Repetir a avaliação após restabelecer a conexão com a IA.'],
+        'reinforcement': [],
         'study_topics': [encounter.case.concept_anchor or 'Revisão do caso'],
         'domains': {'comunicacao': 0, 'anamnese': 0, 'sinais_alarme': 0, 'investigacao': 0, 'raciocinio': 0, 'conduta': 0, 'seguimento': 0},
     }
-    return _structured(prompt, schema, fallback)
+    return _structured(
+        prompt,
+        schema,
+        fallback,
+        primary_model=settings.GEMINI_EVALUATION_MODEL,
+        fallback_model=settings.GEMINI_EVALUATION_FALLBACK_MODEL,
+    )
