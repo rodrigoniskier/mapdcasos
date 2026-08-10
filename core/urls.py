@@ -13,7 +13,12 @@ urlpatterns = [
     path('atendimento/<int:case_id>/conceito/', views.remember_concept, name='remember_concept'),
     path('atendimento/<int:case_id>/concluir/', views.conclude_case, name='conclude_case'),
     path('atendimento/<int:case_id>/resumo/', views.case_summary, name='case_summary'),
+    path('ai/jobs/<uuid:request_id>/', views.ai_job_status, name='ai_job_status'),
     path('professor/', views.professor_dashboard, name='professor_dashboard'),
     path('professor/aluno/<int:user_id>/', views.professor_student, name='professor_student'),
     path('healthz/', views.healthz, name='healthz'),
+    path('app-health/', views.app_health, name='app_health'),
+    path('database-health/', views.database_health, name='database_health'),
+    path('ai-health/', views.ai_health, name='ai_health'),
+    path('queue-health/', views.queue_health, name='queue_health'),
 ]
