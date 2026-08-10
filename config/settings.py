@@ -58,8 +58,8 @@ if DATABASE_URL:
         )
     }
 else:
-    # SQLite is kept only as a low-load/bootstrap fallback. Production with a
-    # simultaneous class should set DATABASE_URL to PostgreSQL.
+    # SQLite is kept as the zero-cost/bootstrap database. It is intentionally
+    # paired with conservative admission control when used in production.
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -69,7 +69,7 @@ else:
     }
 
 # Shared cache is used by rate limiting and circuit breakers. Redis is preferred
-# with multiple workers; the file cache keeps local/test deployments functional.
+# with multiple workers; file cache is sufficient for the one-worker free profile.
 REDIS_URL = os.getenv('REDIS_URL', '').strip()
 if REDIS_URL:
     CACHES = {
@@ -159,6 +159,27 @@ AI_RATE_LIMIT_USER_PER_MINUTE = max(1, int(os.getenv('AI_RATE_LIMIT_USER_PER_MIN
 AI_RATE_LIMIT_GLOBAL_PER_MINUTE = max(10, int(os.getenv('AI_RATE_LIMIT_GLOBAL_PER_MINUTE', '240')))
 AI_RATE_LIMIT_KIND_PER_MINUTE = max(10, int(os.getenv('AI_RATE_LIMIT_KIND_PER_MINUTE', '180')))
 AI_MAX_USER_MESSAGE_CHARS = max(500, int(os.getenv('AI_MAX_USER_MESSAGE_CHARS', '2500')))
+
+# Zero-cost runtime profile. In production, SQLite + no Redis identifies the
+# single-worker PythonAnywhere-style deployment. Explicit FREE_TIER_PROFILE can
+# force it on/off. Caps are safety rails: env values may lower them, but cannot
+# raise them while the free profile is active.
+_free_profile_raw = os.getenv('FREE_TIER_PROFILE', 'auto').strip().lower()
+if _free_profile_raw == 'auto':
+    FREE_TIER_PROFILE = (
+        APP_ENV == 'production'
+        and DATABASES['default']['ENGINE'] == 'django.db.backends.sqlite3'
+        and not REDIS_URL
+    )
+else:
+    FREE_TIER_PROFILE = _free_profile_raw in {'1', 'true', 'yes', 'on'}
+
+if FREE_TIER_PROFILE:
+    AI_MAX_PENDING_PER_USER = min(AI_MAX_PENDING_PER_USER, 1)
+    AI_MAX_PENDING_GLOBAL = min(AI_MAX_PENDING_GLOBAL, 20)
+    AI_RATE_LIMIT_USER_PER_MINUTE = min(AI_RATE_LIMIT_USER_PER_MINUTE, 8)
+    AI_RATE_LIMIT_GLOBAL_PER_MINUTE = min(AI_RATE_LIMIT_GLOBAL_PER_MINUTE, 60)
+    AI_RATE_LIMIT_KIND_PER_MINUTE = min(AI_RATE_LIMIT_KIND_PER_MINUTE, 50)
 
 LOGGING = {
     'version': 1,
