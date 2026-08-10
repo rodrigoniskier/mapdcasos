@@ -50,17 +50,30 @@ class SeedAndSignupTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+    def test_login_accepts_legacy_formatted_stored_rgm(self):
+        User.objects.create_user(
+            username='555.444-3',
+            rgm='555.444-3',
+            password='SenhaForte!2026',
+            role=User.Role.STUDENT,
+        )
+        response = self.client.post(
+            reverse('login'),
+            {'username': '5554443', 'password': 'SenhaForte!2026'},
+        )
+        self.assertEqual(response.status_code, 302)
+
     def test_duplicate_rgm_is_rejected_after_normalization(self):
         User.objects.create_user(
-            username='1112223',
-            rgm='1112223',
+            username='111.222-3',
+            rgm='111.222-3',
             password='SenhaForte!2026',
             role=User.Role.STUDENT,
         )
         response = self.client.post(
             reverse('signup'),
             {
-                'rgm': '111.222-3',
+                'rgm': '1112223',
                 'nome': 'Outro Aluno',
                 'turma': 'T02',
                 'password1': 'OutraSenha!2026',
