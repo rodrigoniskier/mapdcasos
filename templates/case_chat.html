@@ -100,13 +100,17 @@ async function getJob(url){
   return payload;
 }
 async function consumeJob(payload, pendingBubble){
-  let delay = 700;
+  // Polling progressivo e deliberadamente mais lento: no plano gratuito há um
+  // único web worker. Evitar centenas de consultas de status por minuto é mais
+  // importante do que economizar alguns décimos de segundo na atualização visual.
+  let delay = 1500;
   let current = payload;
   while(current.status === 'processing'){
     updateBubble(pendingBubble, 'Sistema', 'Processando com segurança…');
-    await sleep(delay);
+    if(document.hidden) await sleep(Math.max(delay, 3000));
+    else await sleep(delay);
     current = await getJob(current.status_url);
-    delay = Math.min(2500, Math.round(delay * 1.45));
+    delay = Math.min(4000, Math.round(delay * 1.6));
   }
   if(current.status === 'completed'){
     if(current.redirect_url){ window.location.assign(current.redirect_url); return current; }
