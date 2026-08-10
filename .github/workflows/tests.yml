@@ -1,0 +1,35 @@
+name: Django checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Django system check
+        env:
+          DJANGO_SECRET_KEY: ci-only-secret-key
+          DJANGO_DEBUG: 'True'
+        run: python manage.py check
+      - name: Verify migrations
+        env:
+          DJANGO_SECRET_KEY: ci-only-secret-key
+          DJANGO_DEBUG: 'True'
+        run: python manage.py makemigrations --check --dry-run
+      - name: Run tests
+        env:
+          DJANGO_SECRET_KEY: ci-only-secret-key
+          DJANGO_DEBUG: 'True'
+        run: python manage.py test
