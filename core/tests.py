@@ -1,11 +1,12 @@
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .forms import normalize_identifier
 from .models import ClinicalCase, User
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class SeedAndSignupTests(TestCase):
     @classmethod
     def setUpTestData(cls):
