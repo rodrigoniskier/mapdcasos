@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}{{ student.display_name }} • MAPD Casos{% endblock %}
+{% block content %}
+<div class="page-heading"><div><a class="back" href="{% url 'professor_dashboard' %}">← Painel do professor</a><p class="eyebrow">ALUNO</p><h1>{{ student.display_name }}</h1><p>RGM {{ student.rgm }} · {{ student.turma|default:'Sem turma' }}</p></div></div>
+<section class="panel"><h2>Casos atendidos</h2><div class="table-wrap"><table><thead><tr><th>Caso</th><th>Grupo</th><th>Status</th><th>Desfecho</th><th>Nota</th><th>Atualização</th></tr></thead><tbody>{% for e in encounters %}<tr><td>{{ e.case.code }} · {{ e.case.public_title }}</td><td>{{ e.case.get_category_display }}</td><td>{{ e.get_status_display }}</td><td>{{ e.get_outcome_display }}</td><td>{{ e.score|default:'—' }}</td><td>{{ e.updated_at|date:'d/m/Y H:i' }}</td></tr>{% empty %}<tr><td colspan="6">Este aluno ainda não iniciou casos.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Painel do aluno • MAPD Casos{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <p class="eyebrow">PAINEL DO ALUNO</p>
+  <h1>Qual ambulatório você deseja atender hoje?</h1>
+  <p>Escolha um grupo de agentes infecciosos. Cada ambulatório contém 20 pacientes simulados.</p>
+</section>
+<div class="category-grid">
+  {% for card in cards %}
+  <a class="category-card" href="{% url 'category_cases' card.value %}">
+    <div class="category-icon">{% if card.value == 'BACTERIA' %}🦠{% elif card.value == 'FUNGI' %}🍄{% elif card.value == 'VIRUS' %}🧬{% else %}🔬{% endif %}</div>
+    <h2>{{ card.label }}</h2>
+    <p>{{ card.total }} pacientes</p>
+    <div class="progress"><span style="width:{% widthratio card.completed card.total 100 %}%"></span></div>
+    <small>{{ card.completed }} concluídos</small>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

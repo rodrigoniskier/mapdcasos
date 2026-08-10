@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Paciente {{ case.order|stringformat:'02d' }} • MAPD Casos{% endblock %}
+{% block content %}
+<div class="chat-layout">
+  <section class="chat-main">
+    <div class="chat-head">
+      <a class="back" href="{% url 'category_cases' case.category %}">← Pacientes</a>
+      <div><p class="eyebrow">ATENDIMENTO APS</p><h1>Paciente {{ case.order|stringformat:'02d' }}</h1><p>{{ case.patient_name }}, {{ case.age }} anos • {{ case.sex }} • {{ case.get_difficulty_display }}</p></div>
+    </div>
+    <div id="messages" class="messages">
+      {% for message in encounter.messages.all %}
+        {% if message.role != 'SYSTEM' %}
+        <article class="bubble {{ message.role|lower }}">
+          <small>{{ message.get_role_display }}</small>
+          <div>{{ message.content|linebreaksbr }}</div>
+        </article>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <form id="chat-form" class="chat-form" method="post" action="{% url 'send_message' case.id %}">
+      {% csrf_token %}
+      <textarea name="message" id="message-input" rows="2" maxlength="2500" placeholder="Converse com o paciente: anamnese, exame físico, hipóteses, exames e conduta..." required></textarea>
+      <button class="btn btn-primary" type="submit">Enviar</button>
+    </form>
+  </section>
+  <aside class="clinical-tools">
+    <div class="tool-card"><p class="eyebrow">APOIO AO RACIOCÍNIO</p><h2>Ferramentas</h2><p>Use quando precisar de uma pista. Elas ficam registradas no atendimento.</p></div>
+    <button id="preceptor-btn" class="btn btn-secondary tool-btn" data-url="{% url 'ask_preceptor' case.id %}">🩺 Pedir conselho ao preceptor</button>
+    <button id="concept-btn" class="btn btn-secondary tool-btn" data-url="{% url 'remember_concept' case.id %}">🧠 Lembre o conceito</button>
+    <form method="post" action="{% url 'conclude_case' case.id %}" onsubmit="return confirm('Concluir o atendimento e solicitar a avaliação do preceptor?');">
+      {% csrf_token %}<button class="btn btn-finish" type="submit">✓ Concluir atendimento / Avaliação</button>
+    </form>
+    <div class="privacy-note">O paciente virtual conhece uma ficha-mestra oculta e não deve revelar o diagnóstico antes da conclusão.</div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+const messagesBox = document.getElementById('messages');
+const input = document.getElementById('message-input');
+function scrollBottom(){ messagesBox.scrollTop = messagesBox.scrollHeight; }
+function addBubble(role, label, text){
+  const article = document.createElement('article'); article.className = 'bubble ' + role;
+  const small = document.createElement('small'); small.textContent = label;
+  const div = document.createElement('div'); div.textContent = text;
+  article.append(small, div); messagesBox.appendChild(article); scrollBottom();
+}
+async function postForm(url, data={}){
+  const form = new FormData(); form.append('csrfmiddlewaretoken', csrf);
+  Object.entries(data).forEach(([k,v]) => form.append(k,v));
+  const r = await fetch(url, {method:'POST', body:form, headers:{'X-Requested-With':'XMLHttpRequest'}});
+  const payload = await r.json(); if(!r.ok) throw new Error(payload.error || 'Falha na solicitação.'); return payload;
+}
+document.getElementById('chat-form').addEventListener('submit', async (e)=>{
+  e.preventDefault(); const text = input.value.trim(); if(!text) return;
+  const btn = e.currentTarget.querySelector('button'); btn.disabled=true; input.disabled=true;
+  addBubble('student','Aluno',text); input.value='';
+  try { const data = await postForm(e.currentTarget.action,{message:text}); addBubble('patient','Paciente',data.reply); }
+  catch(err){ addBubble('system','Sistema',err.message); }
+  finally { btn.disabled=false; input.disabled=false; input.focus(); }
+});
+async function toolClick(buttonId, role, label){
+  const btn=document.getElementById(buttonId); btn.disabled=true;
+  try { const data=await postForm(btn.dataset.url); addBubble(role,label,data.reply); }
+  catch(err){ addBubble('system','Sistema',err.message); }
+  finally { btn.disabled=false; }
+}
+document.getElementById('preceptor-btn').addEventListener('click',()=>toolClick('preceptor-btn','preceptor','Preceptor'));
+document.getElementById('concept-btn').addEventListener('click',()=>toolClick('concept-btn','tutor','Lembre o conceito'));
+scrollBottom();
+</script>
+{% endblock %}

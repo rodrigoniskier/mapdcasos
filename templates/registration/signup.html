@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Cadastro • MAPD Casos{% endblock %}
+{% block content %}
+<section class="auth-wrap">
+  <div class="auth-card wide">
+    <p class="eyebrow">PRIMEIRO ACESSO</p>
+    <h1>Cadastro do aluno</h1>
+    <p class="muted">Seu RGM será seu usuário de acesso.</p>
+    <form method="post" class="stack-form">
+      {% csrf_token %}
+      {% for field in form %}
+      <label>{{ field.label }}{{ field }}{% if field.help_text %}<small>{{ field.help_text|safe }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</label>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">Criar cadastro</button>
+    </form>
+    <p class="auth-foot"><a href="{% url 'login' %}">Voltar ao login</a></p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Conclusão do caso • MAPD Casos{% endblock %}
+{% block content %}
+<div class="summary-head">
+  <div><p class="eyebrow">CASO CONCLUÍDO</p><h1>Paciente {{ case.order|stringformat:'02d' }}</h1><p>{{ case.public_title }}</p></div>
+  <div class="score-ring"><strong>{{ encounter.score }}</strong><span>/100</span></div>
+</div>
+<div class="summary-grid">
+  <section class="panel"><h2>Resumo do caso</h2><p>{{ feedback.case_summary }}</p><div class="reveal"><strong>Diagnóstico:</strong> {{ case.diagnosis }}<br><strong>Agente:</strong> {{ case.pathogen }}</div></section>
+  <section class="panel"><h2>Seu atendimento</h2><p>{{ feedback.care_summary }}</p></section>
+  <section class="panel"><h2>Pontos fortes</h2><ul>{% for item in feedback.strengths %}<li>{{ item }}</li>{% empty %}<li>Sem itens registrados.</li>{% endfor %}</ul></section>
+  <section class="panel"><h2>Necessidades de reforço</h2><ul>{% for item in feedback.reinforcement %}<li>{{ item }}</li>{% empty %}<li>Sem itens registrados.</li>{% endfor %}</ul></section>
+  <section class="panel span-2"><h2>O que revisar no MAPD</h2><div class="tags">{% for item in feedback.study_topics %}<span>{{ item }}</span>{% empty %}<span>{{ case.concept_anchor }}</span>{% endfor %}</div></section>
+</div>
+<div class="summary-actions"><a class="btn btn-secondary" href="{% url 'category_cases' case.category %}">Voltar aos pacientes</a></div>
+{% endblock %}
