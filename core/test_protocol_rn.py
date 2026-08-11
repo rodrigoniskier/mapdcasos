@@ -11,9 +11,9 @@ from core.services.ai_schemas import EvaluationAIResponse, PatientAIResponse
 
 
 class FakeHTTPError(Exception):
-    def __init__(self, status_code):
+    def __init__(self, status_code, message=None):
         self.status_code = status_code
-        super().__init__(f'HTTP {status_code}')
+        super().__init__(message or f'HTTP {status_code}')
 
 
 class AIGatewayProtocolTests(SimpleTestCase):
@@ -22,6 +22,10 @@ class AIGatewayProtocolTests(SimpleTestCase):
         self.assertEqual(classify_exception(FakeHTTPError(503)), AIErrorType.TRANSIENT)
         self.assertEqual(classify_exception(FakeHTTPError(400)), AIErrorType.CLIENT)
         self.assertEqual(classify_exception(FakeHTTPError(401)), AIErrorType.AUTH)
+
+    def test_error_router_treats_missing_model_as_routable(self):
+        error = FakeHTTPError(404, "Model 'gemini-new-model' not found")
+        self.assertEqual(classify_exception(error), AIErrorType.MODEL)
 
     def test_patient_output_rejects_extra_keys(self):
         payload = json.dumps({
