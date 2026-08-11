@@ -132,7 +132,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 
 # RN AI Gateway -------------------------------------------------------------
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY', '')
-GEMINI_API_VERSION = os.getenv('GEMINI_API_VERSION', 'v1')
+# The SDK defaults to v1beta and the official Interactions examples use this
+# endpoint. Keep it as the operational default because some hosted environments
+# have returned 404 for /v1/interactions even though v1 is documented as GA.
+GEMINI_API_VERSION = os.getenv('GEMINI_API_VERSION', 'v1beta')
 GEMINI_CHAT_MODEL = os.getenv('GEMINI_CHAT_MODEL', 'gemini-3.5-flash-lite')
 GEMINI_CHAT_FALLBACK_MODEL = os.getenv('GEMINI_CHAT_FALLBACK_MODEL', 'gemini-3.6-flash')
 GEMINI_EVALUATION_MODEL = os.getenv('GEMINI_EVALUATION_MODEL', os.getenv('GEMINI_MODEL', 'gemini-3.6-flash'))
