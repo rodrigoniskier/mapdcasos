@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -8,6 +9,7 @@ from core.models import AIJob, ClinicalCase, Encounter, Message, User
 from core.services.ai_gateway import AIErrorType, check_rate_limit, classify_exception, validate_output
 from core.services.ai_jobs import queue_patient_job
 from core.services.ai_schemas import EvaluationAIResponse, PatientAIResponse
+from core.services.prompts import patient_system
 
 
 class FakeHTTPError(Exception):
@@ -82,6 +84,31 @@ class AIGatewayProtocolTests(SimpleTestCase):
         decision = check_rate_limit(999, 'PATIENT')
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, 'user')
+
+
+class PatientPromptContractTests(SimpleTestCase):
+    def test_requested_exams_must_return_immediate_simulated_results(self):
+        case = SimpleNamespace(
+            patient_name='Paciente Teste',
+            age=40,
+            sex='Feminino',
+            complaint='Febre e tosse.',
+            pathogen='Agente oculto',
+            diagnosis='Diagnóstico oculto',
+            master_context={
+                'physical_exam_if_requested': 'Avaliar sinais vitais e ausculta pulmonar.',
+                'tests_if_requested': 'Hemograma e radiografia conforme o quadro.',
+            },
+            expected_management='Conduta teste.',
+            red_flags='Hipoxemia.',
+            concept_anchor='Conceito teste.',
+        )
+        prompt = patient_system(case)
+        self.assertIn('considere esse exame COMO JÁ REALIZADO', prompt)
+        self.assertIn('informe imediatamente o resultado/achado', prompt)
+        self.assertIn('resultado de TODOS eles', prompt)
+        self.assertIn('Não interprete o resultado para o aluno', prompt)
+        self.assertNotIn('informe de modo natural que ele não está disponível naquele momento', prompt)
 
 
 class AIJobIdempotencyTests(TestCase):
