@@ -80,8 +80,6 @@ def _client():
     from google import genai
     from google.genai import types
 
-    # Explicitly configure the SDK retry layer. The application does not add a
-    # second retry loop around these same transport failures.
     retry_options = types.HttpRetryOptions(
         attempts=settings.GEMINI_RETRY_ATTEMPTS,
         initial_delay=0.8,
@@ -135,8 +133,6 @@ def classify_exception(exc: Exception) -> AIErrorType:
 
 
 def _safe_error_message(exc: Exception) -> str:
-    # Keep only a short technical summary. Never serialize headers/request payloads,
-    # which might contain credentials.
     text = str(exc).replace('\n', ' ').strip()
     return text[:450]
 
@@ -330,12 +326,14 @@ def start_background_interaction(
                 duration_ms=duration_ms,
             )
             logger.warning(
-                'RN AI start failed kind=%s model=%s error_type=%s code=%s duration_ms=%s',
+                'RN AI start failed kind=%s model=%s api=%s error_type=%s code=%s duration_ms=%s error=%s',
                 kind,
                 model,
+                settings.GEMINI_API_VERSION,
                 error_type,
                 last_result.error_code,
                 duration_ms,
+                last_result.error_message,
             )
             if not _fallback_allowed(error_type):
                 break
@@ -361,6 +359,15 @@ def poll_interaction(interaction_id: str, model: str = '') -> GatewayResult:
                 setattr(synthetic, 'status_code', code)
             error_type = classify_exception(synthetic)
             circuit_record_failure(model, error_type)
+            logger.warning(
+                'RN AI background failed interaction=%s model=%s api=%s error_type=%s code=%s error=%s',
+                interaction_id,
+                model,
+                settings.GEMINI_API_VERSION,
+                error_type,
+                code or '',
+                message[:450],
+            )
             return GatewayResult(
                 False,
                 interaction_id=interaction_id,
@@ -389,13 +396,24 @@ def poll_interaction(interaction_id: str, model: str = '') -> GatewayResult:
         duration_ms = int((time.monotonic() - started) * 1000)
         error_type = classify_exception(exc)
         circuit_record_failure(model, error_type)
+        safe_message = _safe_error_message(exc)
+        logger.warning(
+            'RN AI poll failed interaction=%s model=%s api=%s error_type=%s code=%s duration_ms=%s error=%s',
+            interaction_id,
+            model,
+            settings.GEMINI_API_VERSION,
+            error_type,
+            _status_code(exc) or '',
+            duration_ms,
+            safe_message,
+        )
         return GatewayResult(
             False,
             interaction_id=interaction_id,
             model=model,
             error_type=error_type,
             error_code=str(_status_code(exc) or ''),
-            error_message=_safe_error_message(exc),
+            error_message=safe_message,
             duration_ms=duration_ms,
         )
 
