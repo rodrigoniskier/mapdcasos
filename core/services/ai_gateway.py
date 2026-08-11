@@ -17,6 +17,7 @@ class AIErrorType(StrEnum):
     CONFIG = 'AI_CONFIG_ERROR'
     AUTH = 'AI_AUTH_ERROR'
     CLIENT = 'AI_CLIENT_ERROR'
+    MODEL = 'AI_MODEL_UNAVAILABLE'
     QUOTA = 'AI_QUOTA_ERROR'
     TRANSIENT = 'AI_TRANSIENT_ERROR'
     SAFETY = 'AI_SAFETY_ERROR'
@@ -30,6 +31,7 @@ class AIErrorType(StrEnum):
 class TaskPolicy:
     primary_model: str
     fallback_model: str
+    compatibility_model: str
     max_output_tokens: int
     thinking_level: str
 
@@ -62,12 +64,14 @@ def policy_for(kind: str) -> TaskPolicy:
         return TaskPolicy(
             primary_model=settings.GEMINI_EVALUATION_MODEL,
             fallback_model=settings.GEMINI_EVALUATION_FALLBACK_MODEL,
+            compatibility_model='gemini-2.5-flash',
             max_output_tokens=settings.GEMINI_EVALUATION_MAX_OUTPUT_TOKENS,
             thinking_level=settings.GEMINI_EVALUATION_THINKING_LEVEL,
         )
     return TaskPolicy(
         primary_model=settings.GEMINI_CHAT_MODEL,
         fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
+        compatibility_model='gemini-2.5-flash-lite',
         max_output_tokens=settings.GEMINI_CHAT_MAX_OUTPUT_TOKENS,
         thinking_level=settings.GEMINI_CHAT_THINKING_LEVEL,
     )
@@ -119,6 +123,11 @@ def classify_exception(exc: Exception) -> AIErrorType:
     text = f'{type(exc).__name__} {exc}'.lower()
     if code in {401, 403}:
         return AIErrorType.AUTH
+    if code == 404 and 'model' in text and ('not found' in text or 'not_found' in text):
+        # A documented model can still be unavailable to a specific project or
+        # rollout cohort. Treat that as a routing condition, not as a terminal
+        # malformed-request error, so the Model Router can continue safely.
+        return AIErrorType.MODEL
     if code == 429:
         return AIErrorType.QUOTA
     if code == 408 or (code is not None and 500 <= code <= 599):
@@ -214,6 +223,7 @@ def _model_candidates(policy: TaskPolicy, force_model: str = ''):
     for model, fallback_used in (
         (policy.primary_model, False),
         (policy.fallback_model, True),
+        (policy.compatibility_model, True),
     ):
         if model and model not in seen:
             seen.add(model)
@@ -221,7 +231,13 @@ def _model_candidates(policy: TaskPolicy, force_model: str = ''):
 
 
 def _fallback_allowed(error_type: AIErrorType) -> bool:
-    if error_type in {AIErrorType.TRANSIENT, AIErrorType.UNKNOWN, AIErrorType.SCHEMA, AIErrorType.EMPTY}:
+    if error_type in {
+        AIErrorType.MODEL,
+        AIErrorType.TRANSIENT,
+        AIErrorType.UNKNOWN,
+        AIErrorType.SCHEMA,
+        AIErrorType.EMPTY,
+    }:
         return True
     if error_type == AIErrorType.QUOTA:
         return settings.GEMINI_FALLBACK_ON_QUOTA
@@ -243,6 +259,16 @@ def _interaction_usage(interaction) -> tuple[int | None, int | None]:
 def _status(interaction) -> str:
     value = _value(getattr(interaction, 'status', ''))
     return str(value or '').lower()
+
+
+def _generation_config(model: str, policy: TaskPolicy) -> dict:
+    config = {'max_output_tokens': policy.max_output_tokens}
+    # Gemini 3.x uses thinking_level. Gemini 2.5 has a different thinking
+    # control surface; omit it in the compatibility tier rather than risk a
+    # 400 caused by a generation parameter unsupported by that family.
+    if not model.startswith('gemini-2.5-'):
+        config['thinking_level'] = policy.thinking_level
+    return config
 
 
 def start_background_interaction(
@@ -285,10 +311,7 @@ def start_background_interaction(
                 'input': input_text,
                 'background': bool(settings.AI_BACKGROUND_ENABLED),
                 'store': bool(settings.AI_BACKGROUND_ENABLED),
-                'generation_config': {
-                    'max_output_tokens': policy.max_output_tokens,
-                    'thinking_level': policy.thinking_level,
-                },
+                'generation_config': _generation_config(model, policy),
                 'response_format': {
                     'type': 'text',
                     'mime_type': 'application/json',
