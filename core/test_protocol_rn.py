@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 
@@ -84,6 +85,19 @@ class AIGatewayProtocolTests(SimpleTestCase):
         decision = check_rate_limit(999, 'PATIENT')
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.reason, 'user')
+
+
+class GeminiModelDefaultsTests(SimpleTestCase):
+    """gemini-3.5-flash-lite returned MODEL_UNAVAILABLE for the production key/project
+    (see .env.example) and must never be the default primary/fallback model again,
+    even when a deployment's .env omits these vars."""
+
+    def test_default_models_avoid_known_unavailable_model(self):
+        broken_model = 'gemini-3.5-flash-lite'
+        self.assertNotEqual(settings.GEMINI_CHAT_MODEL, broken_model)
+        self.assertNotEqual(settings.GEMINI_CHAT_FALLBACK_MODEL, broken_model)
+        self.assertNotEqual(settings.GEMINI_EVALUATION_MODEL, broken_model)
+        self.assertNotEqual(settings.GEMINI_EVALUATION_FALLBACK_MODEL, broken_model)
 
 
 class PatientPromptContractTests(SimpleTestCase):

@@ -50,13 +50,15 @@ A chave Gemini nunca é enviada ao navegador.
 ## Modelos Gemini
 
 ```env
-GEMINI_CHAT_MODEL=gemini-3.5-flash-lite
-GEMINI_CHAT_FALLBACK_MODEL=gemini-3.6-flash
+GEMINI_CHAT_MODEL=gemini-3.6-flash
+GEMINI_CHAT_FALLBACK_MODEL=gemini-2.5-flash-lite
 GEMINI_EVALUATION_MODEL=gemini-3.6-flash
-GEMINI_EVALUATION_FALLBACK_MODEL=gemini-3.5-flash-lite
+GEMINI_EVALUATION_FALLBACK_MODEL=gemini-2.5-flash
 ```
 
-O chat prioriza o modelo leve; a avaliação final prioriza o modelo mais robusto.
+O 3.5 Flash-Lite retornou MODEL_UNAVAILABLE para a chave/projeto de produção e não
+deve ficar no hot path. Chat e avaliação final priorizam o 3.6 Flash, validado de
+ponta a ponta; o fallback usa a família 2.5, compatível com a mesma conta.
 
 ## Instalação / atualização
 
