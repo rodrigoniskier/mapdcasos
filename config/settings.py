@@ -138,12 +138,15 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY', '')
 # /v1/interactions 404s after a code update.
 GEMINI_API_VERSION_REQUESTED = os.getenv('GEMINI_API_VERSION', 'v1beta').strip() or 'v1beta'
 GEMINI_API_VERSION = 'v1beta' if GEMINI_API_VERSION_REQUESTED == 'v1' else GEMINI_API_VERSION_REQUESTED
-# gemini-3.5-flash-lite returned MODEL_UNAVAILABLE for the production key/project
-# (see .env.example) and must not stay in the hot path as a default.
+# gemini-2.5-* models are valid for the classic generateContent endpoint (see
+# `models.list()`) but returned 404 Not Found when used to create an interaction
+# against the preview Interactions API for the production key/project. Only the
+# 3.x-tier models and the *-latest aliases were confirmed to work there — keep
+# fallback defaults inside that family.
 GEMINI_CHAT_MODEL = os.getenv('GEMINI_CHAT_MODEL', 'gemini-3.6-flash')
-GEMINI_CHAT_FALLBACK_MODEL = os.getenv('GEMINI_CHAT_FALLBACK_MODEL', 'gemini-2.5-flash-lite')
+GEMINI_CHAT_FALLBACK_MODEL = os.getenv('GEMINI_CHAT_FALLBACK_MODEL', 'gemini-3.5-flash-lite')
 GEMINI_EVALUATION_MODEL = os.getenv('GEMINI_EVALUATION_MODEL', os.getenv('GEMINI_MODEL', 'gemini-3.6-flash'))
-GEMINI_EVALUATION_FALLBACK_MODEL = os.getenv('GEMINI_EVALUATION_FALLBACK_MODEL', 'gemini-2.5-flash')
+GEMINI_EVALUATION_FALLBACK_MODEL = os.getenv('GEMINI_EVALUATION_FALLBACK_MODEL', 'gemini-3.5-flash')
 GEMINI_RETRY_ATTEMPTS = max(1, int(os.getenv('GEMINI_RETRY_ATTEMPTS', '3')))
 GEMINI_HTTP_TIMEOUT_MS = max(3000, int(os.getenv('GEMINI_HTTP_TIMEOUT_MS', '15000')))
 GEMINI_CHAT_MAX_OUTPUT_TOKENS = max(128, int(os.getenv('GEMINI_CHAT_MAX_OUTPUT_TOKENS', '512')))

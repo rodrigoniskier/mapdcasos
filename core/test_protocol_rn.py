@@ -11,6 +11,7 @@ from core.services.ai_gateway import (
     AIErrorType,
     check_rate_limit,
     classify_exception,
+    policy_for,
     start_background_interaction,
     validate_output,
 )
@@ -94,16 +95,30 @@ class AIGatewayProtocolTests(SimpleTestCase):
 
 
 class GeminiModelDefaultsTests(SimpleTestCase):
-    """gemini-3.5-flash-lite returned MODEL_UNAVAILABLE for the production key/project
-    (see .env.example) and must never be the default primary/fallback model again,
-    even when a deployment's .env omits these vars."""
+    """gemini-2.5-* models are valid for generateContent (confirmed via
+    client.models.list() against the production key) but returned 404 Not Found
+    when creating an interaction against the preview Interactions API. Only 3.x-tier
+    models and *-latest aliases were confirmed to work there via direct production
+    testing — keep defaults inside that confirmed-working set."""
 
-    def test_default_models_avoid_known_unavailable_model(self):
-        broken_model = 'gemini-3.5-flash-lite'
-        self.assertNotEqual(settings.GEMINI_CHAT_MODEL, broken_model)
-        self.assertNotEqual(settings.GEMINI_CHAT_FALLBACK_MODEL, broken_model)
-        self.assertNotEqual(settings.GEMINI_EVALUATION_MODEL, broken_model)
-        self.assertNotEqual(settings.GEMINI_EVALUATION_FALLBACK_MODEL, broken_model)
+    BROKEN_ON_INTERACTIONS = {'gemini-2.5-flash-lite', 'gemini-2.5-flash'}
+
+    def test_default_models_avoid_models_broken_on_interactions_api(self):
+        for value in (
+            settings.GEMINI_CHAT_MODEL,
+            settings.GEMINI_CHAT_FALLBACK_MODEL,
+            settings.GEMINI_EVALUATION_MODEL,
+            settings.GEMINI_EVALUATION_FALLBACK_MODEL,
+        ):
+            self.assertNotIn(value, self.BROKEN_ON_INTERACTIONS)
+
+    def test_policy_fallback_tiers_are_distinct(self):
+        # A compatibility_model identical to fallback_model silently collapses
+        # the 3-tier chain to 2 tiers (this exact bug shipped once already).
+        for kind in ('PATIENT', 'EVALUATION'):
+            policy = policy_for(kind)
+            tiers = [policy.primary_model, policy.fallback_model, policy.compatibility_model]
+            self.assertEqual(len(tiers), len(set(tiers)), f'{kind}: fallback tiers collapse into duplicates')
 
 
 class AIGatewayRequestShapeTests(SimpleTestCase):

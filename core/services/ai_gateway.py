@@ -60,18 +60,21 @@ class RateDecision:
 
 
 def policy_for(kind: str) -> TaskPolicy:
+    # 'gemini-flash-lite-latest' is a Google-maintained alias, confirmed to work
+    # against the preview Interactions API, kept distinct from both fallback
+    # defaults above so this tier is never silently collapsed into a duplicate.
     if kind == 'EVALUATION':
         return TaskPolicy(
             primary_model=settings.GEMINI_EVALUATION_MODEL,
             fallback_model=settings.GEMINI_EVALUATION_FALLBACK_MODEL,
-            compatibility_model='gemini-2.5-flash',
+            compatibility_model='gemini-flash-lite-latest',
             max_output_tokens=settings.GEMINI_EVALUATION_MAX_OUTPUT_TOKENS,
             thinking_level=settings.GEMINI_EVALUATION_THINKING_LEVEL,
         )
     return TaskPolicy(
         primary_model=settings.GEMINI_CHAT_MODEL,
         fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
-        compatibility_model='gemini-2.5-flash-lite',
+        compatibility_model='gemini-flash-lite-latest',
         max_output_tokens=settings.GEMINI_CHAT_MAX_OUTPUT_TOKENS,
         thinking_level=settings.GEMINI_CHAT_THINKING_LEVEL,
     )
