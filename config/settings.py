@@ -157,7 +157,11 @@ GEMINI_CIRCUIT_COOLDOWN_SECONDS = max(10, int(os.getenv('GEMINI_CIRCUIT_COOLDOWN
 AI_ENABLED = os.getenv('AI_ENABLED', 'True').lower() in {'1', 'true', 'yes', 'on'}
 PATIENT_AI_ENABLED = os.getenv('PATIENT_AI_ENABLED', 'True').lower() in {'1', 'true', 'yes', 'on'}
 EVALUATION_AI_ENABLED = os.getenv('EVALUATION_AI_ENABLED', 'True').lower() in {'1', 'true', 'yes', 'on'}
-AI_BACKGROUND_ENABLED = os.getenv('AI_BACKGROUND_ENABLED', 'True').lower() in {'1', 'true', 'yes', 'on'}
+# The GET /interactions/{id} poll used by background mode returned 400
+# invalid_request against this key/project on the preview Interactions API,
+# even though synchronous create() (background=False) completes normally.
+# Default to synchronous until that preview endpoint is verified stable.
+AI_BACKGROUND_ENABLED = os.getenv('AI_BACKGROUND_ENABLED', 'False').lower() in {'1', 'true', 'yes', 'on'}
 AI_SCHEMA_REPAIR_ATTEMPTS = max(0, int(os.getenv('AI_SCHEMA_REPAIR_ATTEMPTS', '1')))
 AI_JOB_MAX_WAIT_SECONDS = max(15, int(os.getenv('AI_JOB_MAX_WAIT_SECONDS', '75')))
 AI_MAX_PENDING_PER_USER = max(1, int(os.getenv('AI_MAX_PENDING_PER_USER', '2')))
