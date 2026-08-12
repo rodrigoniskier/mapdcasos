@@ -7,7 +7,13 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from core.models import AIJob, ClinicalCase, Encounter, Message, User
-from core.services.ai_gateway import AIErrorType, check_rate_limit, classify_exception, validate_output
+from core.services.ai_gateway import (
+    AIErrorType,
+    check_rate_limit,
+    classify_exception,
+    start_background_interaction,
+    validate_output,
+)
 from core.services.ai_jobs import queue_patient_job
 from core.services.ai_schemas import EvaluationAIResponse, PatientAIResponse
 from core.services.prompts import patient_system
@@ -98,6 +104,59 @@ class GeminiModelDefaultsTests(SimpleTestCase):
         self.assertNotEqual(settings.GEMINI_CHAT_FALLBACK_MODEL, broken_model)
         self.assertNotEqual(settings.GEMINI_EVALUATION_MODEL, broken_model)
         self.assertNotEqual(settings.GEMINI_EVALUATION_FALLBACK_MODEL, broken_model)
+
+
+class AIGatewayRequestShapeTests(SimpleTestCase):
+    """GET /interactions/{id} polling returned 400 invalid_request against the
+    production key/project on the preview Interactions API, while synchronous
+    create() (background=False) completed normally. Background defaults to off,
+    but 'store' must stay independent of it so previous_interaction_id chaining
+    (patient conversation continuity) keeps working either way."""
+
+    def _fake_client(self, captured):
+        def fake_create(**kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                id='fake-interaction-id',
+                status='completed',
+                output_text='{"reply": "ok"}',
+                usage=None,
+            )
+
+        return SimpleNamespace(interactions=SimpleNamespace(create=fake_create))
+
+    @override_settings(AI_BACKGROUND_ENABLED=False)
+    @patch('core.services.ai_gateway._client')
+    def test_store_stays_enabled_when_background_is_disabled(self, mocked_client):
+        captured = {}
+        mocked_client.return_value = self._fake_client(captured)
+        result = start_background_interaction(
+            kind='PATIENT',
+            system_instruction='sistema',
+            input_text='entrada',
+            schema_model=PatientAIResponse,
+        )
+        self.assertTrue(result.ok)
+        self.assertFalse(captured['background'])
+        self.assertTrue(captured['store'])
+
+    @override_settings(AI_BACKGROUND_ENABLED=True)
+    @patch('core.services.ai_gateway._client')
+    def test_store_stays_enabled_when_background_is_enabled(self, mocked_client):
+        captured = {}
+        mocked_client.return_value = self._fake_client(captured)
+        result = start_background_interaction(
+            kind='PATIENT',
+            system_instruction='sistema',
+            input_text='entrada',
+            schema_model=PatientAIResponse,
+        )
+        self.assertTrue(result.ok)
+        self.assertTrue(captured['background'])
+        self.assertTrue(captured['store'])
+
+    def test_default_background_mode_is_synchronous(self):
+        self.assertFalse(settings.AI_BACKGROUND_ENABLED)
 
 
 class PatientPromptContractTests(SimpleTestCase):

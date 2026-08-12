@@ -310,7 +310,10 @@ def start_background_interaction(
                 'system_instruction': system_instruction,
                 'input': input_text,
                 'background': bool(settings.AI_BACKGROUND_ENABLED),
-                'store': bool(settings.AI_BACKGROUND_ENABLED),
+                # Stored independently of background mode: previous_interaction_id
+                # chaining for patient conversation continuity needs the interaction
+                # retrievable server-side even when we complete synchronously.
+                'store': True,
                 'generation_config': _generation_config(model, policy),
                 'response_format': {
                     'type': 'text',
