@@ -60,18 +60,21 @@ class RateDecision:
 
 
 def policy_for(kind: str) -> TaskPolicy:
+    # 'gemini-flash-lite-latest' is a Google-maintained alias, confirmed to work
+    # against the preview Interactions API, kept distinct from both fallback
+    # defaults above so this tier is never silently collapsed into a duplicate.
     if kind == 'EVALUATION':
         return TaskPolicy(
             primary_model=settings.GEMINI_EVALUATION_MODEL,
             fallback_model=settings.GEMINI_EVALUATION_FALLBACK_MODEL,
-            compatibility_model='gemini-2.5-flash',
+            compatibility_model='gemini-flash-lite-latest',
             max_output_tokens=settings.GEMINI_EVALUATION_MAX_OUTPUT_TOKENS,
             thinking_level=settings.GEMINI_EVALUATION_THINKING_LEVEL,
         )
     return TaskPolicy(
         primary_model=settings.GEMINI_CHAT_MODEL,
         fallback_model=settings.GEMINI_CHAT_FALLBACK_MODEL,
-        compatibility_model='gemini-2.5-flash-lite',
+        compatibility_model='gemini-flash-lite-latest',
         max_output_tokens=settings.GEMINI_CHAT_MAX_OUTPUT_TOKENS,
         thinking_level=settings.GEMINI_CHAT_THINKING_LEVEL,
     )
@@ -293,7 +296,19 @@ def start_background_interaction(
 
     policy = policy_for(kind)
     last_result = GatewayResult(False, error_type=AIErrorType.UNKNOWN)
-    for model, fallback_used in _model_candidates(policy, force_model=force_model):
+    # Synchronous mode (AI_BACKGROUND_ENABLED=False) blocks the calling web worker
+    # for this entire loop, so it needs its own ceiling: without one, up to 3 model
+    # tiers x GEMINI_RETRY_ATTEMPTS x GEMINI_HTTP_TIMEOUT_MS could keep a
+    # single-worker deployment unresponsive to every other request for minutes.
+    # AI_JOB_MAX_WAIT_SECONDS was only enforced later by refresh_job(), which is
+    # never reached once the call already completes/fails inside this loop. The
+    # primary model is always attempted; only further fallback tiers are skipped
+    # once the budget is gone.
+    attempt_budget_deadline = time.monotonic() + settings.AI_JOB_MAX_WAIT_SECONDS
+    for attempt_index, (model, fallback_used) in enumerate(_model_candidates(policy, force_model=force_model)):
+        if attempt_index > 0 and time.monotonic() >= attempt_budget_deadline:
+            logger.warning('RN AI start budget exhausted kind=%s next_model=%s', kind, model)
+            break
         if circuit_is_open(model):
             last_result = GatewayResult(
                 False,
