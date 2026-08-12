@@ -26,7 +26,11 @@ class Command(BaseCommand):
         add('Cache compartilhado Redis', bool(settings.REDIS_URL), 'REDIS_URL configurada' if settings.REDIS_URL else 'cache em arquivo', 'P1')
         add('Gemini configurada', bool(settings.GEMINI_API_KEY) or not settings.AI_ENABLED, f'AI_ENABLED={settings.AI_ENABLED}', 'P1')
         add('AI Gateway habilitado', settings.AI_ENABLED, f'AI_ENABLED={settings.AI_ENABLED}', 'P1')
-        add('Fila/background', settings.AI_BACKGROUND_ENABLED, f'AI_BACKGROUND_ENABLED={settings.AI_BACKGROUND_ENABLED}', 'P1')
+        # Background mode's polling endpoint (GET /interactions/{id}) returned 400
+        # invalid_request on the preview Interactions API for the production key.
+        # Synchronous create() works end to end, so the gate now expects background
+        # off; revisit once that preview polling path is verified stable again.
+        add('Fila/background síncrono', not settings.AI_BACKGROUND_ENABLED, f'AI_BACKGROUND_ENABLED={settings.AI_BACKGROUND_ENABLED}', 'P1')
         add('Rate limit global', settings.AI_RATE_LIMIT_GLOBAL_PER_MINUTE > 0, str(settings.AI_RATE_LIMIT_GLOBAL_PER_MINUTE), 'P1')
         add('Backpressure global', settings.AI_MAX_PENDING_GLOBAL > 0, str(settings.AI_MAX_PENDING_GLOBAL), 'P1')
         add('Retry limitado', 1 <= settings.GEMINI_RETRY_ATTEMPTS <= 5, str(settings.GEMINI_RETRY_ATTEMPTS), 'P1')

@@ -31,7 +31,11 @@ class Command(BaseCommand):
         superusers = User.objects.filter(is_superuser=True).count()
         add('Superusuário único', superusers == 1, f'total={superusers}', 'P0')
         add('Gemini configurada', bool(settings.GEMINI_API_KEY), 'GEMINI_API_KEY carregada' if settings.GEMINI_API_KEY else 'ausente', 'P1')
-        add('Background Gemini', settings.AI_BACKGROUND_ENABLED, f'AI_BACKGROUND_ENABLED={settings.AI_BACKGROUND_ENABLED}', 'P1')
+        # Background mode's polling endpoint (GET /interactions/{id}) returned 400
+        # invalid_request on the preview Interactions API for the production key.
+        # Synchronous create() works end to end, so the gate now expects background
+        # off; revisit once that preview polling path is verified stable again.
+        add('Background Gemini síncrono', not settings.AI_BACKGROUND_ENABLED, f'AI_BACKGROUND_ENABLED={settings.AI_BACKGROUND_ENABLED}', 'P1')
         add('Sessão sem escrita no banco', settings.SESSION_ENGINE == 'django.contrib.sessions.backends.signed_cookies', settings.SESSION_ENGINE, 'P1')
         add('1 job por aluno', settings.AI_MAX_PENDING_PER_USER <= 1, f'AI_MAX_PENDING_PER_USER={settings.AI_MAX_PENDING_PER_USER}', 'P1')
         add('Backpressure conservador', settings.AI_MAX_PENDING_GLOBAL <= 20, f'AI_MAX_PENDING_GLOBAL={settings.AI_MAX_PENDING_GLOBAL}', 'P1')
