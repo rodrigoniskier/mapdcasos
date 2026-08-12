@@ -147,8 +147,13 @@ GEMINI_CHAT_MODEL = os.getenv('GEMINI_CHAT_MODEL', 'gemini-3.6-flash')
 GEMINI_CHAT_FALLBACK_MODEL = os.getenv('GEMINI_CHAT_FALLBACK_MODEL', 'gemini-3.5-flash-lite')
 GEMINI_EVALUATION_MODEL = os.getenv('GEMINI_EVALUATION_MODEL', os.getenv('GEMINI_MODEL', 'gemini-3.6-flash'))
 GEMINI_EVALUATION_FALLBACK_MODEL = os.getenv('GEMINI_EVALUATION_FALLBACK_MODEL', 'gemini-3.5-flash')
-GEMINI_RETRY_ATTEMPTS = max(1, int(os.getenv('GEMINI_RETRY_ATTEMPTS', '3')))
-GEMINI_HTTP_TIMEOUT_MS = max(3000, int(os.getenv('GEMINI_HTTP_TIMEOUT_MS', '15000')))
+# Synchronous mode (see AI_BACKGROUND_ENABLED) blocks the single free-tier web
+# worker for as long as these settings allow, multiplied across up to 3 model
+# fallback tiers. Kept low so a degraded Gemini call can't stall every other
+# student's request; the app-level model-tier fallback already covers most of
+# what SDK-level retries would, at a fraction of the worst-case latency.
+GEMINI_RETRY_ATTEMPTS = max(1, int(os.getenv('GEMINI_RETRY_ATTEMPTS', '1')))
+GEMINI_HTTP_TIMEOUT_MS = max(3000, int(os.getenv('GEMINI_HTTP_TIMEOUT_MS', '10000')))
 GEMINI_CHAT_MAX_OUTPUT_TOKENS = max(128, int(os.getenv('GEMINI_CHAT_MAX_OUTPUT_TOKENS', '512')))
 GEMINI_EVALUATION_MAX_OUTPUT_TOKENS = max(512, int(os.getenv('GEMINI_EVALUATION_MAX_OUTPUT_TOKENS', '1800')))
 GEMINI_CHAT_THINKING_LEVEL = os.getenv('GEMINI_CHAT_THINKING_LEVEL', 'minimal')

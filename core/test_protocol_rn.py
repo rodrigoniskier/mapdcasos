@@ -1,4 +1,5 @@
 import json
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -172,6 +173,36 @@ class AIGatewayRequestShapeTests(SimpleTestCase):
 
     def test_default_background_mode_is_synchronous(self):
         self.assertFalse(settings.AI_BACKGROUND_ENABLED)
+
+
+class AIGatewaySynchronousBudgetTests(SimpleTestCase):
+    """Synchronous mode blocks the single free-tier web worker for the entire
+    model-candidate loop. Without a ceiling, up to 3 model tiers x
+    GEMINI_RETRY_ATTEMPTS x GEMINI_HTTP_TIMEOUT_MS could keep it unresponsive to
+    every other request for minutes; AI_JOB_MAX_WAIT_SECONDS used to be enforced
+    only later by refresh_job(), which is unreachable once the call already
+    completes/fails inside the first start_job(). The primary model is always
+    attempted; only further fallback tiers are skipped once the budget is gone."""
+
+    @override_settings(AI_JOB_MAX_WAIT_SECONDS=0)
+    @patch('core.services.ai_gateway._client')
+    def test_stops_trying_further_models_once_budget_is_exhausted(self, mocked_client):
+        calls = []
+
+        def fake_create(**kwargs):
+            calls.append(kwargs['model'])
+            time.sleep(0.01)
+            raise RuntimeError('simulated transient failure')
+
+        mocked_client.return_value = SimpleNamespace(interactions=SimpleNamespace(create=fake_create))
+        result = start_background_interaction(
+            kind='PATIENT',
+            system_instruction='sistema',
+            input_text='entrada',
+            schema_model=PatientAIResponse,
+        )
+        self.assertFalse(result.ok)
+        self.assertEqual(calls, [settings.GEMINI_CHAT_MODEL])
 
 
 class PatientPromptContractTests(SimpleTestCase):

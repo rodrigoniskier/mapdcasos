@@ -296,7 +296,19 @@ def start_background_interaction(
 
     policy = policy_for(kind)
     last_result = GatewayResult(False, error_type=AIErrorType.UNKNOWN)
-    for model, fallback_used in _model_candidates(policy, force_model=force_model):
+    # Synchronous mode (AI_BACKGROUND_ENABLED=False) blocks the calling web worker
+    # for this entire loop, so it needs its own ceiling: without one, up to 3 model
+    # tiers x GEMINI_RETRY_ATTEMPTS x GEMINI_HTTP_TIMEOUT_MS could keep a
+    # single-worker deployment unresponsive to every other request for minutes.
+    # AI_JOB_MAX_WAIT_SECONDS was only enforced later by refresh_job(), which is
+    # never reached once the call already completes/fails inside this loop. The
+    # primary model is always attempted; only further fallback tiers are skipped
+    # once the budget is gone.
+    attempt_budget_deadline = time.monotonic() + settings.AI_JOB_MAX_WAIT_SECONDS
+    for attempt_index, (model, fallback_used) in enumerate(_model_candidates(policy, force_model=force_model)):
+        if attempt_index > 0 and time.monotonic() >= attempt_budget_deadline:
+            logger.warning('RN AI start budget exhausted kind=%s next_model=%s', kind, model)
+            break
         if circuit_is_open(model):
             last_result = GatewayResult(
                 False,
