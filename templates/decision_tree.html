@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load decision_learning %}
 {% block title %}{{ case.code }} • Árvore decisória{% endblock %}
 {% block content %}
 <div class="tree-shell">
@@ -22,22 +23,51 @@
   {% if answered_rows %}
   <div class="decision-history">
     {% for row in answered_rows %}
+      {% with note=row.node|learning_note:case best=row.node|best_option %}
       <article class="decision-done">
         <div class="decision-stage">{{ row.node.stage }}</div>
         <h3>{{ row.node.prompt }}</h3>
         <p class="chosen-answer">{{ row.answer.selected_text }}</p>
         <div class="feedback-badge quality-{{ row.answer.quality|lower }}">{{ row.quality_label }} · +{{ row.answer.points }}</div>
+        <p class="feedback-text"><strong>Leitura pedagógica:</strong> {{ row.answer|quality_teaching }}</p>
         <p class="feedback-text">{{ row.answer.feedback }}</p>
-        {% if row.node.pearl %}<p class="clinical-pearl"><strong>Pérola clínica:</strong> {{ row.node.pearl }}</p>{% endif %}
+
+        {% if row.answer.quality != 'BEST' %}
+        <div class="correction-card">
+          <span class="learning-label">CONDUTA RECOMENDADA</span>
+          <p class="recommended-conduct">{{ best.text }}</p>
+          <strong>Por que esta é a melhor conduta?</strong>
+          <p>{{ note.theory }}</p>
+        </div>
+        {% else %}
+        <div class="theory-after">
+          <span class="learning-label">FUNDAMENTO TEÓRICO</span>
+          <p>{{ note.theory }}</p>
+        </div>
+        {% endif %}
+
+        <div class="clinical-pearl expanded">
+          <strong>Pérola clínica:</strong> {{ note.pearl }}
+          <small><strong>Por que essa pérola importa?</strong> {{ note.pearl_basis }}</small>
+        </div>
       </article>
+      {% endwith %}
     {% endfor %}
   </div>
   {% endif %}
 
   {% if current_node %}
+  {% with note=current_node|learning_note:case %}
   <section class="decision-current">
     <div class="decision-stage">{{ current_node.stage }}</div>
     <p class="decision-context">{{ current_node.context }}</p>
+
+    <div class="learning-card">
+      <span class="learning-label">REVISÃO RÁPIDA</span>
+      <p>{{ note.theory }}</p>
+      <small>{{ note.base }}</small>
+    </div>
+
     <h2>{{ current_node.prompt }}</h2>
     <form method="post" class="decision-options">
       {% csrf_token %}
@@ -49,8 +79,9 @@
         </button>
       {% endfor %}
     </form>
-    <p class="decision-help">Escolha a conduta que você tomaria agora. A classificação só aparece depois da resposta.</p>
+    <p class="decision-help">Escolha a conduta que você tomaria agora. Depois da resposta, você verá a justificativa teórica, a conduta recomendada quando necessário e uma pérola clínica comentada.</p>
   </section>
+  {% endwith %}
   {% endif %}
 </div>
 {% endblock %}
