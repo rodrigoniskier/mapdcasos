@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load decision_learning %}
 {% block title %}Resumo {{ case.code }} • MAPD Casos{% endblock %}
 {% block content %}
 <div class="summary-head">
@@ -23,17 +24,41 @@
   </section>
 
   <section class="panel span-2">
-    <h2>Suas decisões</h2>
+    <h2>Revisão comentada das suas decisões</h2>
+    <p class="muted">Use esta seção como uma mini-revisão do caso. O objetivo não é apenas conferir a pontuação, mas entender o princípio clínico por trás de cada escolha.</p>
     <div class="tree-review">
       {% for answer in answers %}
-      <div class="review-row">
-        <div>
-          <strong>{{ answer.prompt }}</strong>
-          <p>{{ answer.selected_text }}</p>
-          <small>{{ answer.feedback }}</small>
-        </div>
-        <span class="feedback-badge quality-{{ answer.quality|lower }}">{{ answer.get_quality_display }} · +{{ answer.points }}</span>
-      </div>
+        {% with node=answer|node_for_answer:tree %}
+        {% with note=node|learning_note:case best=node|best_option %}
+        <article class="review-row learning-review-row">
+          <div class="review-content">
+            <strong>{{ answer.prompt }}</strong>
+            <p class="chosen-answer">{{ answer.selected_text }}</p>
+            <span class="feedback-badge quality-{{ answer.quality|lower }}">{{ answer.get_quality_display }} · +{{ answer.points }}</span>
+            <p class="feedback-text"><strong>Leitura pedagógica:</strong> {{ answer|quality_teaching }}</p>
+
+            {% if answer.quality != 'BEST' %}
+            <div class="correction-card compact">
+              <span class="learning-label">CONDUTA RECOMENDADA</span>
+              <p class="recommended-conduct">{{ best.text }}</p>
+              <strong>Justificativa teórica</strong>
+              <p>{{ note.theory }}</p>
+            </div>
+            {% else %}
+            <div class="theory-after compact">
+              <span class="learning-label">POR QUE SUA CONDUTA FOI A MELHOR?</span>
+              <p>{{ note.theory }}</p>
+            </div>
+            {% endif %}
+
+            <div class="clinical-pearl expanded compact">
+              <strong>Pérola clínica:</strong> {{ note.pearl }}
+              <small><strong>Por que essa pérola importa?</strong> {{ note.pearl_basis }}</small>
+            </div>
+          </div>
+        </article>
+        {% endwith %}
+        {% endwith %}
       {% endfor %}
     </div>
   </section>
