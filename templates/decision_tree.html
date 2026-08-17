@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}{{ case.code }} • Árvore decisória{% endblock %}
+{% block content %}
+<div class="tree-shell">
+  <div class="tree-head">
+    <div>
+      <a class="back" href="{% url 'category_cases' 'BACTERIA' %}">← Casos de bactérias</a>
+      <p class="eyebrow">ÁRVORE DECISÓRIA · {{ case.code }}</p>
+      <h1>{{ case.public_title }}</h1>
+      <p><strong>{{ case.patient_name }}</strong>, {{ case.age }} anos · {{ tree.variant_note }}</p>
+    </div>
+    <div class="tree-progress-label"><strong>{{ progress }}/{{ total_nodes }}</strong><span>decisões</span></div>
+  </div>
+
+  <div class="progress tree-progress"><span style="width:{{ progress_pct }}%"></span></div>
+
+  <section class="patient-opening">
+    <span>PACIENTE</span>
+    <p>“{{ case.complaint }}”</p>
+  </section>
+
+  {% if answered_rows %}
+  <div class="decision-history">
+    {% for row in answered_rows %}
+      <article class="decision-done">
+        <div class="decision-stage">{{ row.node.stage }}</div>
+        <h3>{{ row.node.prompt }}</h3>
+        <p class="chosen-answer">{{ row.answer.selected_text }}</p>
+        <div class="feedback-badge quality-{{ row.answer.quality|lower }}">{{ row.quality_label }} · +{{ row.answer.points }}</div>
+        <p class="feedback-text">{{ row.answer.feedback }}</p>
+        {% if row.node.pearl %}<p class="clinical-pearl"><strong>Pérola clínica:</strong> {{ row.node.pearl }}</p>{% endif %}
+      </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if current_node %}
+  <section class="decision-current">
+    <div class="decision-stage">{{ current_node.stage }}</div>
+    <p class="decision-context">{{ current_node.context }}</p>
+    <h2>{{ current_node.prompt }}</h2>
+    <form method="post" class="decision-options">
+      {% csrf_token %}
+      <input type="hidden" name="node_id" value="{{ current_node.id }}">
+      {% for option in current_node.options %}
+        <button type="submit" name="option_id" value="{{ option.id }}" class="decision-option">
+          <span class="option-letter">{{ forloop.counter }}</span>
+          <span>{{ option.text }}</span>
+        </button>
+      {% endfor %}
+    </form>
+    <p class="decision-help">Escolha a conduta que você tomaria agora. A classificação só aparece depois da resposta.</p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

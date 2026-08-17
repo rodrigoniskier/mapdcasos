@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Modo de estudo • MAPD Casos{% endblock %}
+{% block content %}
+<section class="hero compact mode-hero">
+  <p class="eyebrow">COMO VOCÊ QUER ESTUDAR?</p>
+  <h1>Escolha sua modalidade</h1>
+  <p>Você poderá trocar de modalidade depois. O progresso de cada modo é salvo separadamente.</p>
+</section>
+
+<form method="post" class="mode-grid">
+  {% csrf_token %}
+  <button class="mode-card" type="submit" name="mode" value="AI">
+    <span class="mode-icon">✦</span>
+    <span class="mode-kicker">CONVERSAÇÃO</span>
+    <strong>Com auxílio de IA</strong>
+    <span>Atenda o paciente virtual em conversa livre, solicite dados e conclua sua conduta.</span>
+    <small>Disponível para bactérias, fungos, vírus e parasitas.</small>
+  </button>
+
+  <button class="mode-card" type="submit" name="mode" value="TREE">
+    <span class="mode-icon">⌘</span>
+    <span class="mode-kicker">DECISÕES CLÍNICAS</span>
+    <strong>Árvore decisória</strong>
+    <span>Conduza o atendimento por pontos de decisão com feedback baseado em evidências.</span>
+    <small>Hoje: 20 casos de bactérias.</small>
+  </button>
+</form>
+{% endblock %}

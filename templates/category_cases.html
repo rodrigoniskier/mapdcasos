@@ -2,16 +2,23 @@
 {% block title %}{{ category_label }} • MAPD Casos{% endblock %}
 {% block content %}
 <div class="page-heading">
-  <div><a class="back" href="{% url 'dashboard' %}">← Painel</a><p class="eyebrow">AMBULATÓRIO</p><h1>{{ category_label }}</h1><p>Escolha um paciente. O diagnóstico permanece oculto até a conclusão.</p></div>
+  <div>
+    <a class="back" href="{% url 'dashboard' %}">← Painel</a>
+    <p class="eyebrow">{{ mode_label|upper }}</p>
+    <h1>{{ category_label }}</h1>
+    <p>{% if mode == 'TREE' %}Escolha um paciente e avance pelas decisões. O diagnóstico fica oculto até o fim.{% else %}Escolha um paciente. O diagnóstico permanece oculto até a conclusão.{% endif %}</p>
+  </div>
 </div>
 <div class="case-list">
   {% for row in rows %}
-  <a class="case-row" href="{% url 'case_chat' row.case.id %}">
-    <div class="case-number">{{ row.case.order|stringformat:'02d' }}</div>
-    <div class="case-info"><strong>Paciente {{ row.case.order|stringformat:'02d' }}</strong><span>{{ row.case.public_title }}</span></div>
-    <span class="difficulty {{ row.case.difficulty|lower }}">{{ row.case.get_difficulty_display }}</span>
-    <span class="status-pill {% if row.encounter.status == 'COMPLETED' %}done{% elif row.encounter %}open{% endif %}">{% if row.encounter.status == 'COMPLETED' %}Concluído · {{ row.encounter.score }}{% elif row.encounter %}Em andamento{% else %}Iniciar{% endif %}</span>
-  </a>
+    <a class="case-row" href="{% if mode == 'TREE' %}{% url 'decision_tree_case' row.case.id %}{% else %}{% url 'case_chat' row.case.id %}{% endif %}">
+      <div class="case-number">{{ row.case.order|stringformat:'02d' }}</div>
+      <div class="case-info"><strong>Paciente {{ row.case.order|stringformat:'02d' }}</strong><span>{{ row.case.public_title }}</span></div>
+      <span class="difficulty {{ row.case.difficulty|lower }}">{{ row.case.get_difficulty_display }}</span>
+      <span class="status-pill {% if row.encounter.status == 'COMPLETED' %}done{% elif row.encounter %}open{% endif %}">
+        {% if row.encounter.status == 'COMPLETED' %}Concluído · {{ row.encounter.score }}{% elif row.encounter %}Em andamento{% else %}Iniciar{% endif %}
+      </span>
+    </a>
   {% endfor %}
 </div>
 {% endblock %}

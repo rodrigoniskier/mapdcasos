@@ -77,14 +77,17 @@ class Encounter(models.Model):
         PARTIAL = 'PARTIAL', 'Conduta parcialmente adequada'
         INADEQUATE = 'INADEQUATE', 'Conduta inadequada'
 
+    class Mode(models.TextChoices):
+        AI = 'AI', 'Com auxílio de IA'
+        TREE = 'TREE', 'Árvore decisória'
+
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='encounters')
     case = models.ForeignKey(ClinicalCase, on_delete=models.PROTECT, related_name='encounters')
+    mode = models.CharField(max_length=8, choices=Mode.choices, default=Mode.AI, db_index=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.OPEN)
     outcome = models.CharField(max_length=16, choices=Outcome.choices, default=Outcome.NOT_ASSESSED)
     score = models.PositiveSmallIntegerField(null=True, blank=True)
     final_feedback = models.JSONField(default=dict, blank=True)
-    # Gemini Interactions server-side state: only the provider interaction ID is stored locally.
-    # Student identity/RGM is never sent as model context.
     patient_interaction_id = models.CharField(max_length=512, blank=True)
     patient_interaction_model = models.CharField(max_length=80, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -93,10 +96,45 @@ class Encounter(models.Model):
 
     class Meta:
         ordering = ['-updated_at']
-        constraints = [models.UniqueConstraint(fields=['student', 'case'], name='unique_student_case_encounter')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'case', 'mode'],
+                name='unique_student_case_mode_encounter',
+            )
+        ]
 
     def __str__(self):
-        return f'{self.student} / {self.case.code}'
+        return f'{self.student} / {self.case.code} / {self.mode}'
+
+
+class DecisionAnswer(models.Model):
+    class Quality(models.TextChoices):
+        BEST = 'BEST', 'Melhor resposta'
+        SUBOPTIMAL = 'SUBOPTIMAL', 'Correta, mas subótima'
+        PLAUSIBLE = 'PLAUSIBLE', 'Plausível, mas incorreta'
+        WRONG = 'WRONG', 'Totalmente incorreta'
+
+    encounter = models.ForeignKey(Encounter, on_delete=models.CASCADE, related_name='decision_answers')
+    node_id = models.CharField(max_length=64)
+    prompt = models.TextField()
+    selected_option_id = models.CharField(max_length=24)
+    selected_text = models.TextField()
+    quality = models.CharField(max_length=16, choices=Quality.choices)
+    points = models.PositiveSmallIntegerField(default=0)
+    feedback = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['encounter', 'node_id'],
+                name='unique_decision_answer_per_node',
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.encounter} / {self.node_id} / {self.quality}'
 
 
 class Message(models.Model):
@@ -154,7 +192,6 @@ class AIJob(models.Model):
     result = models.JSONField(default=dict, blank=True)
     error_type = models.CharField(max_length=64, blank=True)
     error_code = models.CharField(max_length=32, blank=True)
-    # Sanitized technical summary only. Never store secrets or full provider payloads here.
     error_message = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)

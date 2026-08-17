@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import AIJob, ClinicalCase, Encounter, Message, User
+from .models import AIJob, ClinicalCase, DecisionAnswer, Encounter, Message, User
 
 
 @admin.register(User)
@@ -21,9 +21,23 @@ class ClinicalCaseAdmin(admin.ModelAdmin):
 
 @admin.register(Encounter)
 class EncounterAdmin(admin.ModelAdmin):
-    list_display = ('student', 'case', 'status', 'outcome', 'score', 'updated_at')
-    list_filter = ('status', 'outcome', 'case__category')
+    list_display = ('student', 'case', 'mode', 'status', 'outcome', 'score', 'updated_at')
+    list_filter = ('mode', 'status', 'outcome', 'case__category')
     search_fields = ('student__username', 'student__first_name', 'student__last_name', 'case__code')
+
+
+@admin.register(DecisionAnswer)
+class DecisionAnswerAdmin(admin.ModelAdmin):
+    list_display = ('encounter', 'node_id', 'quality', 'points', 'created_at')
+    list_filter = ('quality', 'encounter__mode', 'encounter__case__category')
+    search_fields = ('encounter__student__username', 'encounter__case__code', 'prompt', 'selected_text')
+    readonly_fields = (
+        'encounter', 'node_id', 'prompt', 'selected_option_id', 'selected_text',
+        'quality', 'points', 'feedback', 'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(Message)

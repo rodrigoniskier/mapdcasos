@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MAPD Casos{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/decision_tree.css' %}">
 </head>
 <body>
 <header class="topbar">
@@ -15,6 +16,7 @@
   </a>
   {% if user.is_authenticated %}
     <div class="top-actions">
+      {% if not user.is_superuser %}<a class="mode-switch" href="{% url 'study_mode' %}">Trocar modo</a>{% endif %}
       <span class="user-chip">{{ user.display_name }}</span>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link-button" type="submit">Sair</button></form>
     </div>

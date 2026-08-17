@@ -1,6 +1,6 @@
 # MAPD Casos
 
-Plataforma educacional de simulação clínica por chatbot para estudo de infecções na Atenção Primária à Saúde (APS) do SUS, baseada no livro **Mecanismos de Agressão, Patológicos e de Defesa**, de Prof. Rodrigo Niskier Ferreira Barbosa.
+Plataforma educacional de simulação clínica para estudo de infecções na Atenção Primária à Saúde (APS) do SUS, baseada no livro **Mecanismos de Agressão, Patológicos e de Defesa**, de Prof. Rodrigo Niskier Ferreira Barbosa.
 
 ## Estado atual
 
@@ -17,15 +17,21 @@ O perfil gratuito é detectado automaticamente quando o ambiente está em `produ
 - Normalização de RGM e compatibilidade com cadastros legados formatados.
 - Cadastro atômico e unicidade real no banco.
 - Um fluxo de **superusuário/professor único**.
+- Escolha pós-login entre **estudo com auxílio de IA** e **Árvore decisória**.
 - Painel do aluno com quatro ambulatórios: **Bactérias, Fungos, Vírus e Parasitas**.
 - **80 pacientes iniciais**, 20 por categoria.
 - Paciente, preceptor, tutor conceitual e avaliação final por IA.
+- **Árvore decisória sem IA para os 20 casos bacterianos**, com seis decisões por caso.
+- Em cada decisão da árvore há quatro níveis pedagógicos: **melhor resposta**, **correta mas subótima**, **plausível mas incorreta** e **totalmente incorreta**.
+- Ordem das alternativas variável e determinística por caso/ponto de decisão, evitando padrão posicional da resposta correta.
+- Pontuação e feedback imediatos por decisão, com resumo final e revelação do agente etiológico.
+- Trilhas IA e árvore registradas separadamente, permitindo que o mesmo aluno resolva o mesmo caso nas duas modalidades.
+- Conteúdo da árvore centrado em reconhecimento sindrômico/etiológico, uso criterioso de exames, stewardship de antimicrobianos, sinais de alarme e limites da APS/SUS.
 - AI Gateway centralizado com Model Router, Error Router, retry, fallback, circuit breaker e kill switches.
 - Structured Output com Pydantic e validação semântica.
 - Idempotência por `request_id`, single-flight, rate limiting e backpressure.
-- Execução Gemini em background com polling progressivo no navegador.
 - Sessão assinada em cookie e redução de escritas no SQLite.
-- Painel do professor com turmas, alunos, casos concluídos, médias e atividade recente.
+- Painel do professor com turmas, alunos, casos concluídos, médias, modalidade e atividade recente.
 - Logs técnicos com `request_id`, usuário anonimizado, duração, modelo, erros e tokens.
 - Health checks de aplicação, banco, IA e fila.
 - Backup SQLite verificado e rotativo.
@@ -45,7 +51,7 @@ O perfil gratuito é detectado automaticamente quando o ambiente está em `produ
 - Redis opcional por `REDIS_URL`
 - Variáveis de ambiente em `.env`
 
-A chave Gemini nunca é enviada ao navegador.
+A chave Gemini nunca é enviada ao navegador. A modalidade de árvore decisória não realiza chamadas à IA.
 
 ## Modelos Gemini
 
@@ -90,8 +96,6 @@ Em produção com SQLite e sem Redis, o perfil gratuito limita automaticamente:
 - 8 novas solicitações/minuto por aluno;
 - 60 novas solicitações/minuto globalmente;
 - 50 novas solicitações/minuto por tipo de tarefa.
-
-O polling do navegador também usa intervalos progressivos para reduzir requisições ao único web worker.
 
 ### Gate do piloto gratuito
 
@@ -139,4 +143,6 @@ Depois, use **Reload** na aba Web.
 
 ## Observação acadêmica
 
-Os 80 casos são uma primeira carga didática estruturada para validação docente. Antes de uso avaliativo institucional, recomenda-se revisar condutas esperadas e sinais de alarme contra PCDT, manuais e notas técnicas vigentes do Ministério da Saúde. A revisão pode ser feita pelo Django Admin sem alterar a lógica do chatbot.
+A árvore bacteriana foi estruturada para treino formativo e usa como âncoras documentos oficiais brasileiros, incluindo PCDT do Ministério da Saúde, protocolos de Atenção Básica, manual nacional de tuberculose e PCDT de IST. Em condições nas quais não existe um único esquema nacional universal para todo contexto ambulatorial, a árvore ensina a selecionar tratamento de primeira linha conforme protocolo SUS/local, perfil do paciente, gravidade, resistência e necessidade de referência, evitando transformar uma regra local em recomendação nacional.
+
+Antes de uso avaliativo institucional, recomenda-se auditoria docente periódica das condutas e links oficiais, porque protocolos clínicos podem ser atualizados.

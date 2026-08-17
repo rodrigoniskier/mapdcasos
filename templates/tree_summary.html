@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Resumo {{ case.code }} • MAPD Casos{% endblock %}
+{% block content %}
+<div class="summary-head">
+  <div>
+    <p class="eyebrow">ÁRVORE CONCLUÍDA · {{ case.code }}</p>
+    <h1>{{ case.public_title }}</h1>
+    <p>{{ feedback.summary }}</p>
+  </div>
+  <div class="score-ring"><strong>{{ encounter.score }}</strong><span>/100</span></div>
+</div>
+
+<div class="summary-grid">
+  <section class="panel">
+    <h2>Diagnóstico revelado</h2>
+    <p><strong>{{ case.diagnosis }}</strong></p>
+    <div class="reveal"><strong>Agente etiológico:</strong> <em>{{ case.pathogen }}</em></div>
+  </section>
+  <section class="panel">
+    <h2>Foco de aprendizagem</h2>
+    <p>{{ tree.focus }}</p>
+    <p><strong>Pontos:</strong> {{ feedback.points }}/{{ feedback.max_points }}</p>
+  </section>
+
+  <section class="panel span-2">
+    <h2>Suas decisões</h2>
+    <div class="tree-review">
+      {% for answer in answers %}
+      <div class="review-row">
+        <div>
+          <strong>{{ answer.prompt }}</strong>
+          <p>{{ answer.selected_text }}</p>
+          <small>{{ answer.feedback }}</small>
+        </div>
+        <span class="feedback-badge quality-{{ answer.quality|lower }}">{{ answer.get_quality_display }} · +{{ answer.points }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel span-2">
+    <h2>Fontes oficiais e institucionais</h2>
+    <p class="muted">As árvores são educacionais e priorizam documentos do Ministério da Saúde/SUS. Protocolos locais podem adaptar esquemas conforme resistência, disponibilidade e perfil do paciente.</p>
+    <ul class="source-list">
+      {% for source in tree.sources %}
+        <li><a href="{{ source.url }}" target="_blank" rel="noopener">{{ source.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<div class="summary-actions">
+  <a class="btn btn-primary" href="{% url 'category_cases' 'BACTERIA' %}">Próximo paciente</a>
+  <a class="btn btn-secondary" href="{% url 'study_mode' %}">Trocar modalidade</a>
+</div>
+{% endblock %}
