@@ -1,7 +1,9 @@
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from .decision_trees import QUALITY, find_option, get_tree
+from .decision_trees import QUALITY, get_tree
 from .models import ClinicalCase, DecisionAnswer, Encounter, User
 
 
@@ -93,18 +95,68 @@ class DecisionTreeFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("dashboard"))
 
+    def test_answer_post_renders_next_step_without_redirect(self):
+        self._select_tree_mode()
+        tree = get_tree(self.case)
+        first = tree["nodes"][0]
+        best = next(option for option in first["options"] if option["quality"] == "BEST")
+
+        response = self.client.post(
+            reverse("decision_tree_case", args=[self.case.id]),
+            {"node_id": first["id"], "option_id": best["id"]},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "decision_tree.html")
+        self.assertEqual(response.context["progress"], 1)
+        self.assertEqual(response.context["current_node"]["id"], tree["nodes"][1]["id"])
+        self.assertEqual(DecisionAnswer.objects.count(), 1)
+
+    def test_hot_post_avoids_duplicate_case_lookup_and_answer_count_query(self):
+        self._select_tree_mode()
+        tree = get_tree(self.case)
+        first = tree["nodes"][0]
+        best = next(option for option in first["options"] if option["quality"] == "BEST")
+
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.post(
+                reverse("decision_tree_case", args=[self.case.id]),
+                {"node_id": first["id"], "option_id": best["id"]},
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        clinical_case_selects = [
+            item["sql"]
+            for item in captured.captured_queries
+            if "select" in item["sql"].lower() and "core_clinicalcase" in item["sql"].lower()
+        ]
+        self.assertEqual(len(clinical_case_selects), 1)
+        self.assertFalse(
+            any(
+                "count(" in item["sql"].lower()
+                and "core_decisionanswer" in item["sql"].lower()
+                for item in captured.captured_queries
+            )
+        )
+
     def test_best_path_completes_with_100(self):
         self._select_tree_mode()
 
         tree = get_tree(self.case)
-        for node in tree["nodes"]:
+        for index, node in enumerate(tree["nodes"]):
             best = next(option for option in node["options"] if option["quality"] == "BEST")
             response = self.client.post(
                 reverse("decision_tree_case", args=[self.case.id]),
                 {"node_id": node["id"], "option_id": best["id"]},
                 secure=True,
             )
-            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.status_code, 200)
+            if index < len(tree["nodes"]) - 1:
+                self.assertTemplateUsed(response, "decision_tree.html")
+            else:
+                self.assertTemplateUsed(response, "tree_summary.html")
 
         encounter = Encounter.objects.get(
             student=self.student,
