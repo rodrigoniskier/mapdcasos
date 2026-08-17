@@ -1,0 +1,66 @@
+name: Apply bacteria decision-tree patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/patches/bacteria-tree-part01.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct verified source files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import gzip
+          import hashlib
+          import json
+          from pathlib import Path
+
+          parts = [Path(f'.github/patches/bacteria-tree-part{i:02d}.txt').read_text() for i in range(1, 9)]
+          encoded = ''.join(parts)
+          expected_encoded = '561adc6643aac5a6c5fc8a59744c06173d895eaa9f05bb45048318f4286c1f94'
+          expected_json = '26d0f7caf64c831913b13b49f4af147188a3beeeaa34dd67343816231a3ff3c4'
+          if hashlib.sha256(encoded.encode()).hexdigest() != expected_encoded:
+              raise SystemExit('Payload base64 checksum mismatch; refusing to modify repository files.')
+          raw = gzip.decompress(base64.b64decode(encoded))
+          if hashlib.sha256(raw).hexdigest() != expected_json:
+              raise SystemExit('Payload JSON checksum mismatch; refusing to modify repository files.')
+          data = json.loads(raw.decode('utf-8'))
+          if len(data) != 17:
+              raise SystemExit(f'Unexpected file count: {len(data)}')
+          for filename, content in data.items():
+              path = Path(filename)
+              if path.is_absolute() or '..' in path.parts:
+                  raise SystemExit(f'Unsafe payload path: {filename}')
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_text(content, encoding='utf-8')
+          print(f'Reconstructed {len(data)} verified files.')
+          PY
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate decision-tree implementation
+        run: |
+          python -m py_compile core/models.py core/views.py core/urls.py core/admin.py core/decision_trees.py core/migrations/0003_decision_tree_mode.py core/test_decision_tree.py
+          python manage.py makemigrations --check --dry-run
+          python manage.py test core.test_decision_tree
+
+      - name: Commit implementation
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md core templates static
+          git commit -m 'Add AI-independent bacteria decision trees'
+          git push origin HEAD:main
