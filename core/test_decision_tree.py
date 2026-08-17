@@ -75,13 +75,23 @@ class DecisionTreeFlowTests(TestCase):
         self.assertEqual(Encounter.objects.filter(student=self.student, case=self.case).count(), 2)
 
     def test_mode_choice_is_saved_in_session(self):
-        response = self.client.post(reverse("study_mode"), {"mode": Encounter.Mode.TREE})
-        self.assertRedirects(response, reverse("dashboard"))
+        response = self.client.post(
+            reverse("study_mode"),
+            {"mode": Encounter.Mode.TREE},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard"))
         self.assertEqual(self.client.session["study_mode"], Encounter.Mode.TREE)
 
     def _select_tree_mode(self):
-        response = self.client.post(reverse("study_mode"), {"mode": Encounter.Mode.TREE})
-        self.assertRedirects(response, reverse("dashboard"))
+        response = self.client.post(
+            reverse("study_mode"),
+            {"mode": Encounter.Mode.TREE},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard"))
 
     def test_best_path_completes_with_100(self):
         self._select_tree_mode()
@@ -92,8 +102,9 @@ class DecisionTreeFlowTests(TestCase):
             response = self.client.post(
                 reverse("decision_tree_case", args=[self.case.id]),
                 {"node_id": node["id"], "option_id": best["id"]},
+                secure=True,
             )
-            self.assertIn(response.status_code, (302,))
+            self.assertEqual(response.status_code, 302)
 
         encounter = Encounter.objects.get(
             student=self.student,
@@ -111,5 +122,16 @@ class DecisionTreeFlowTests(TestCase):
     def test_tree_route_blocks_non_bacterial_case(self):
         fungi = make_case(order=2, category=ClinicalCase.Category.FUNGI)
         self._select_tree_mode()
-        response = self.client.get(reverse("decision_tree_case", args=[fungi.id]))
-        self.assertRedirects(response, reverse("dashboard"))
+        response = self.client.get(
+            reverse("decision_tree_case", args=[fungi.id]),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("dashboard"))
+        self.assertFalse(
+            Encounter.objects.filter(
+                student=self.student,
+                case=fungi,
+                mode=Encounter.Mode.TREE,
+            ).exists()
+        )
