@@ -12,5 +12,12 @@
   <section class="panel"><h2>Necessidades de reforço</h2><ul>{% for item in feedback.reinforcement %}<li>{{ item }}</li>{% empty %}<li>Sem itens registrados.</li>{% endfor %}</ul></section>
   <section class="panel span-2"><h2>O que revisar no MAPD</h2><div class="tags">{% for item in feedback.study_topics %}<span>{{ item }}</span>{% empty %}<span>{{ case.concept_anchor }}</span>{% endfor %}</div></section>
 </div>
-<div class="summary-actions"><a class="btn btn-secondary" href="{% url 'category_cases' case.category %}">Voltar aos pacientes</a></div>
+<div class="summary-actions">
+  <a class="btn btn-primary" href="{% url 'ai_transcript' case.id %}">💬 Visualizar conversa</a>
+  <form method="post" action="{% url 'restart_ai_case' case.id %}" onsubmit="return confirm('Reiniciar este caso? A conversa e a avaliação desta tentativa serão apagadas para iniciar do zero.');">
+    {% csrf_token %}
+    <button class="btn btn-secondary" type="submit">↻ Reiniciar caso</button>
+  </form>
+  <a class="btn btn-secondary" href="{% url 'category_cases' case.category %}">Voltar aos pacientes</a>
+</div>
 {% endblock %}
