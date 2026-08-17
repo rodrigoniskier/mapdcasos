@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import tree_views, views
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -14,8 +14,8 @@ urlpatterns = [
     path('atendimento/<int:case_id>/conceito/', views.remember_concept, name='remember_concept'),
     path('atendimento/<int:case_id>/concluir/', views.conclude_case, name='conclude_case'),
     path('atendimento/<int:case_id>/resumo/', views.case_summary, name='case_summary'),
-    path('arvore/<int:case_id>/', views.decision_tree_case, name='decision_tree_case'),
-    path('arvore/<int:case_id>/resumo/', views.tree_summary, name='tree_summary'),
+    path('arvore/<int:case_id>/', tree_views.decision_tree_case, name='decision_tree_case'),
+    path('arvore/<int:case_id>/resumo/', tree_views.tree_summary, name='tree_summary'),
     path('ai/jobs/<uuid:request_id>/', views.ai_job_status, name='ai_job_status'),
     path('professor/', views.professor_dashboard, name='professor_dashboard'),
     path('professor/aluno/<int:user_id>/', views.professor_student, name='professor_student'),
