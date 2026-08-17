@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load decision_learning %}
+{% block title %}Histórico {{ case.code }} • MAPD Casos{% endblock %}
+{% block content %}
+<div class="summary-head">
+  <div>
+    <p class="eyebrow">HISTÓRICO DA ÁRVORE · SOMENTE LEITURA</p>
+    <h1>{{ case.public_title }}</h1>
+    <p>Veja a sequência de decisões registrada nesta tentativa concluída.</p>
+  </div>
+  <div class="score-ring"><strong>{{ encounter.score }}</strong><span>/100</span></div>
+</div>
+
+<div class="summary-grid">
+  <section class="panel span-2">
+    <h2>Percurso completo</h2>
+    <div class="tree-review">
+      {% for answer in answers %}
+        {% with node=answer|node_for_answer:tree %}
+        {% with best=node|best_option %}
+        <article class="review-row learning-review-row">
+          <div class="review-content">
+            <strong>{{ answer.prompt }}</strong>
+            <p class="chosen-answer">{{ answer.selected_text }}</p>
+            <span class="feedback-badge quality-{{ answer.quality|lower }}">{{ answer.get_quality_display }} · +{{ answer.points }}</span>
+            {% if answer.quality != 'BEST' %}
+              <div class="correction-card compact">
+                <span class="learning-label">CONDUTA RECOMENDADA</span>
+                <p class="recommended-conduct">{{ best.text }}</p>
+              </div>
+            {% endif %}
+          </div>
+        </article>
+        {% endwith %}
+        {% endwith %}
+      {% empty %}
+        <p>Não há decisões registradas nesta tentativa.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div class="summary-actions">
+  <a class="btn btn-primary" href="{% url 'tree_summary' case.id %}">Ver revisão comentada</a>
+  <form method="post" action="{% url 'restart_tree_case' case.id %}" onsubmit="return confirm('Reiniciar este caso? As respostas e a avaliação desta tentativa serão apagadas para iniciar do zero.');">
+    {% csrf_token %}
+    <button class="btn btn-secondary" type="submit">↻ Reiniciar caso</button>
+  </form>
+  <a class="btn btn-secondary" href="{% url 'category_cases' 'BACTERIA' %}">Voltar aos pacientes</a>
+</div>
+{% endblock %}
