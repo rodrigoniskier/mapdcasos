@@ -75,7 +75,12 @@
 </div>
 
 <div class="summary-actions">
-  <a class="btn btn-primary" href="{% url 'category_cases' 'BACTERIA' %}">Próximo paciente</a>
+  <a class="btn btn-primary" href="{% url 'tree_transcript' case.id %}">🧭 Visualizar percurso</a>
+  <form method="post" action="{% url 'restart_tree_case' case.id %}" onsubmit="return confirm('Reiniciar este caso? As respostas e a avaliação desta tentativa serão apagadas para iniciar do zero.');">
+    {% csrf_token %}
+    <button class="btn btn-secondary" type="submit">↻ Reiniciar caso</button>
+  </form>
+  <a class="btn btn-secondary" href="{% url 'category_cases' 'BACTERIA' %}">Próximo paciente</a>
   <a class="btn btn-secondary" href="{% url 'study_mode' %}">Trocar modalidade</a>
 </div>
 {% endblock %}
