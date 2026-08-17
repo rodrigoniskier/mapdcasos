@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Conversa encerrada • MAPD Casos{% endblock %}
+{% block content %}
+<div class="chat-layout">
+  <section class="chat-main">
+    <div class="chat-head">
+      <a class="back" href="{% url 'case_summary' case.id %}">← Voltar ao resumo</a>
+      <div>
+        <p class="eyebrow">CONVERSA ENCERRADA · SOMENTE LEITURA</p>
+        <h1>Paciente {{ case.order|stringformat:'02d' }}</h1>
+        <p>{{ case.patient_name }}, {{ case.age }} anos • {{ case.sex }} • {{ case.get_difficulty_display }}</p>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:1rem;">
+      <strong>Diagnóstico:</strong> {{ case.diagnosis }}<br>
+      <strong>Agente:</strong> {{ case.pathogen }}
+    </div>
+
+    <div class="messages transcript-messages">
+      {% for message in conversation %}
+        <article class="bubble {{ message.role|lower }}">
+          <small>{{ message.get_role_display }}</small>
+          <div>{{ message.content|linebreaksbr }}</div>
+        </article>
+      {% empty %}
+        <div class="panel"><p>Não há mensagens registradas nesta tentativa.</p></div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="clinical-tools">
+    <div class="tool-card">
+      <p class="eyebrow">TENTATIVA CONCLUÍDA</p>
+      <h2>Histórico preservado</h2>
+      <p>Esta tela mostra a conversa exatamente como foi registrada durante o atendimento.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'case_summary' case.id %}">Ver avaliação final</a>
+    <form method="post" action="{% url 'restart_ai_case' case.id %}" onsubmit="return confirm('Reiniciar este caso? A conversa e a avaliação desta tentativa serão apagadas para iniciar do zero.');">
+      {% csrf_token %}
+      <button class="btn btn-secondary" type="submit">↻ Reiniciar caso</button>
+    </form>
+  </aside>
+</div>
+{% endblock %}
