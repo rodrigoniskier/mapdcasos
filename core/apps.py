@@ -9,6 +9,12 @@ class CoreConfig(AppConfig):
         # Register Protocol RN deployment checks.
         from . import checks  # noqa: F401
 
+        # Calibrate all decision-tree alternatives before any case is rendered
+        # or answered. This keeps distractors plausible and option lengths
+        # balanced without changing scoring or deterministic ordering.
+        from .decision_option_installer import install_balanced_options
+        install_balanced_options()
+
         # last_login is not used by MAPD Casos. Disabling its signal avoids one
         # database write on every login, which materially reduces SQLite lock
         # contention during classroom access peaks.
