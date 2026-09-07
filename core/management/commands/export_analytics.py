@@ -163,6 +163,126 @@ class Command(BaseCommand):
             .order_by("turma")
         )
 
+        usage = (
+            students
+            .annotate(
+                encounters_n=Count("encounters", distinct=True),
+                completed_n=Count(
+                    "encounters",
+                    filter=Q(
+                        encounters__status=Encounter.Status.COMPLETED
+                    ),
+                    distinct=True,
+                ),
+                ai_n=Count(
+                    "encounters",
+                    filter=Q(encounters__mode=Encounter.Mode.AI),
+                    distinct=True,
+                ),
+                tree_n=Count(
+                    "encounters",
+                    filter=Q(encounters__mode=Encounter.Mode.TREE),
+                    distinct=True,
+                ),
+            )
+        )
+
+        active_n = usage.filter(encounters_n__gt=0).count()
+        two_plus_encounters = usage.filter(encounters_n__gte=2).count()
+        five_plus_encounters = usage.filter(encounters_n__gte=5).count()
+        two_plus_completed = usage.filter(completed_n__gte=2).count()
+        five_plus_completed = usage.filter(completed_n__gte=5).count()
+        both_modes = usage.filter(ai_n__gt=0, tree_n__gt=0).count()
+
+        adequate_completed = Encounter.objects.filter(
+            status=Encounter.Status.COMPLETED,
+            outcome=Encounter.Outcome.ADEQUATE,
+        ).count()
+
+        distinct_cases_used = (
+            Encounter.objects
+            .values("case_id")
+            .distinct()
+            .count()
+        )
+
+        award_metrics = {
+            "engagement": {
+                "active_students": active_n,
+                "students_with_2plus_encounters": two_plus_encounters,
+                "students_with_2plus_encounters_pct": round(
+                    two_plus_encounters * 100 / active_n, 1
+                ) if active_n else 0,
+                "students_with_5plus_encounters": five_plus_encounters,
+                "students_with_5plus_encounters_pct": round(
+                    five_plus_encounters * 100 / active_n, 1
+                ) if active_n else 0,
+                "students_with_2plus_completed": two_plus_completed,
+                "students_with_2plus_completed_pct": round(
+                    two_plus_completed * 100 / active_n, 1
+                ) if active_n else 0,
+                "students_with_5plus_completed": five_plus_completed,
+                "students_with_5plus_completed_pct": round(
+                    five_plus_completed * 100 / active_n, 1
+                ) if active_n else 0,
+                "students_using_both_modes": both_modes,
+                "students_using_both_modes_pct": round(
+                    both_modes * 100 / active_n, 1
+                ) if active_n else 0,
+            },
+            "measurable_benefits": {
+                "completed_encounters": completed_enc,
+                "completion_rate_pct": round(
+                    completed_enc * 100 / total_enc, 1
+                ) if total_enc else 0,
+                "average_score": (
+                    round(overall_score, 2)
+                    if overall_score is not None
+                    else None
+                ),
+                "adequate_completed_encounters": adequate_completed,
+                "adequate_completed_encounters_pct": round(
+                    adequate_completed * 100 / completed_enc, 1
+                ) if completed_enc else 0,
+                "structured_decisions": total_decisions,
+                "best_or_suboptimal_decisions_pct": round(
+                    favorable * 100 / total_decisions, 1
+                ) if total_decisions else 0,
+            },
+            "university_impact": {
+                "registered_students": students.count(),
+                "active_students": active_n,
+                "students_with_completed_case": completed_students,
+                "student_messages": Message.objects.filter(
+                    role=Message.Role.STUDENT
+                ).count(),
+                "clinical_decisions": total_decisions,
+                "distinct_cases_used": distinct_cases_used,
+            },
+            "teaching_learning_contribution": {
+                "study_modes": 2,
+                "active_cases": ClinicalCase.objects.filter(active=True).count(),
+                "case_categories": ClinicalCase.objects.filter(
+                    active=True
+                ).values("category").distinct().count(),
+                "distinct_cases_already_used": distinct_cases_used,
+                "student_generated_interactions": (
+                    Message.objects.filter(
+                        role=Message.Role.STUDENT
+                    ).count()
+                    + total_decisions
+                ),
+            },
+            "originality": {
+                "automatically_quantifiable": False,
+                "evidence_requires_project_narrative": True,
+            },
+            "replicability_sustainability": {
+                "automatically_quantifiable": False,
+                "evidence_requires_architecture_and_implementation_narrative": True,
+            },
+        }
+
         case_categories = list(
             ClinicalCase.objects
             .filter(active=True)
@@ -241,6 +361,7 @@ class Command(BaseCommand):
                     favorable * 100 / total_decisions, 1
                 ) if total_decisions else 0,
             },
+            "award_metrics": award_metrics,
             "messages": messages,
             "student_activity": {
                 key: round(value, 2)
