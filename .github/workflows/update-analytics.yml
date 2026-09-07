@@ -1,0 +1,80 @@
+name: Update MAPD Analytics
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 12 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-mapd-analytics
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch analytics
+        env:
+          ANALYTICS_EXPORT_TOKEN: ${{ secrets.ANALYTICS_EXPORT_TOKEN }}
+        run: |
+          curl --fail --silent --show-error \
+            --retry 3 \
+            --retry-all-errors \
+            -H "Authorization: Bearer ${ANALYTICS_EXPORT_TOKEN}" \
+            "https://mapdcasos.pythonanywhere.com/analytics/export/" \
+            -o /tmp/summary.new.json
+
+          python -m json.tool /tmp/summary.new.json >/dev/null
+
+      - name: Compare analytics
+        id: compare
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          new = json.loads(
+              Path("/tmp/summary.new.json").read_text(encoding="utf-8")
+          )
+
+          old_path = Path("analytics/summary.json")
+          old = (
+              json.loads(old_path.read_text(encoding="utf-8"))
+              if old_path.exists()
+              else {}
+          )
+
+          new_compare = dict(new)
+          old_compare = dict(old)
+
+          new_compare.pop("generated_at", None)
+          old_compare.pop("generated_at", None)
+
+          changed = new_compare != old_compare
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"changed={str(changed).lower()}\n")
+          PY
+
+      - name: Update summary
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          cp /tmp/summary.new.json analytics/summary.json
+
+      - name: Commit analytics
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add analytics/summary.json
+          git commit -m "Update MAPD Casos analytics"
+          git push
