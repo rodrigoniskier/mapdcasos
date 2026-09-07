@@ -222,3 +222,6 @@ LOGGING = {
         },
     },
 }
+
+# Analytics export
+ANALYTICS_EXPORT_TOKEN = os.getenv('ANALYTICS_EXPORT_TOKEN', '').strip()

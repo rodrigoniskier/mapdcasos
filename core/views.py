@@ -1,10 +1,14 @@
+import hmac
+import json
 import logging
 from collections import defaultdict
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import IntegrityError, OperationalError, connection, transaction
+from django.core.management import call_command
 from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -636,4 +640,27 @@ def healthz(request):
             'ai_enabled': settings.AI_ENABLED,
         },
         status=status,
+    )
+
+
+@require_GET
+def analytics_export(request):
+    token = settings.ANALYTICS_EXPORT_TOKEN
+    supplied = request.headers.get("Authorization", "")
+    expected = f"Bearer {token}"
+
+    if not token or not hmac.compare_digest(supplied, expected):
+        return JsonResponse({"detail": "Unauthorized"}, status=401)
+
+    call_command("export_analytics", verbosity=0)
+
+    path = Path(settings.BASE_DIR) / "analytics" / "summary.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    return JsonResponse(
+        data,
+        json_dumps_params={
+            "ensure_ascii": False,
+            "indent": 2,
+        },
     )

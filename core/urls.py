@@ -23,6 +23,7 @@ urlpatterns = [
     path('ai/jobs/<uuid:request_id>/', views.ai_job_status, name='ai_job_status'),
     path('professor/', views.professor_dashboard, name='professor_dashboard'),
     path('professor/aluno/<int:user_id>/', views.professor_student, name='professor_student'),
+    path('analytics/export/', views.analytics_export, name='analytics_export'),
     path('healthz/', views.healthz, name='healthz'),
     path('app-health/', views.app_health, name='app_health'),
     path('database-health/', views.database_health, name='database_health'),
