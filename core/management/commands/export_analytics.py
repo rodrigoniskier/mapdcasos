@@ -248,7 +248,6 @@ class Command(BaseCommand):
                 else value
                 for key, value in activity.items()
             },
-            "classes_raw": turmas,
         }
 
         output_dir = Path(settings.BASE_DIR) / "analytics"
