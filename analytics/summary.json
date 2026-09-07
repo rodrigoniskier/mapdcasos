@@ -1,0 +1,246 @@
+{
+  "project": "MAPD Casos",
+  "generated_at": "2026-09-07T01:24:24.868945-03:00",
+  "privacy": {
+    "contains_personal_data": false,
+    "contains_names": false,
+    "contains_rgm": false,
+    "contains_email": false,
+    "aggregation_only": true
+  },
+  "usage_period": {
+    "first_use": "2026-08-10T14:52:22.967322-03:00",
+    "last_use": "2026-09-01T18:50:53.504410-03:00"
+  },
+  "students": {
+    "registered": 111,
+    "active": 99,
+    "with_completed_case": 85,
+    "activation_rate_pct": 89.2,
+    "completed_case_rate_pct": 85.9
+  },
+  "cases": {
+    "active": 80,
+    "by_category": [
+      {
+        "category": "BACTERIA",
+        "cases": 20
+      },
+      {
+        "category": "FUNGI",
+        "cases": 20
+      },
+      {
+        "category": "PARASITE",
+        "cases": 20
+      },
+      {
+        "category": "VIRUS",
+        "cases": 20
+      }
+    ]
+  },
+  "encounters": {
+    "total": 432,
+    "completed": 312,
+    "completion_rate_pct": 72.2,
+    "average_score": 87.08,
+    "by_mode": [
+      {
+        "mode": "AI",
+        "students": 87,
+        "encounters": 259,
+        "completed": 183,
+        "average_score": 83.75,
+        "completion_rate_pct": 70.7
+      },
+      {
+        "mode": "TREE",
+        "students": 61,
+        "encounters": 173,
+        "completed": 129,
+        "average_score": 91.8,
+        "completion_rate_pct": 74.6
+      }
+    ],
+    "by_category": [
+      {
+        "case__category": "BACTERIA",
+        "students": 99,
+        "encounters": 427,
+        "completed": 310,
+        "average_score": 87.07,
+        "completion_rate_pct": 72.6
+      },
+      {
+        "case__category": "PARASITE",
+        "students": 1,
+        "encounters": 1,
+        "completed": 1,
+        "average_score": 88.0,
+        "completion_rate_pct": 100.0
+      },
+      {
+        "case__category": "VIRUS",
+        "students": 2,
+        "encounters": 4,
+        "completed": 1,
+        "average_score": 90.0,
+        "completion_rate_pct": 25.0
+      }
+    ]
+  },
+  "decisions": {
+    "total": 821,
+    "quality_counts": {
+      "BEST": 668,
+      "PLAUSIBLE": 35,
+      "SUBOPTIMAL": 95,
+      "WRONG": 23
+    },
+    "quality_percentages": {
+      "BEST": 81.4,
+      "PLAUSIBLE": 4.3,
+      "SUBOPTIMAL": 11.6,
+      "WRONG": 2.8
+    },
+    "best_or_suboptimal_pct": 92.9
+  },
+  "messages": {
+    "total": 4935,
+    "student": 2110,
+    "patient": 2368,
+    "preceptor": 215,
+    "tutor": 59,
+    "system": 183
+  },
+  "student_activity": {
+    "average_encounters": 4.36,
+    "minimum_encounters": 1,
+    "maximum_encounters": 23,
+    "average_completed": 3.15,
+    "maximum_completed": 17
+  },
+  "classes_raw": [
+    {
+      "turma": "4 C",
+      "students": 1
+    },
+    {
+      "turma": "4 a",
+      "students": 1
+    },
+    {
+      "turma": "4A",
+      "students": 2
+    },
+    {
+      "turma": "4B",
+      "students": 2
+    },
+    {
+      "turma": "4C",
+      "students": 1
+    },
+    {
+      "turma": "4° A",
+      "students": 1
+    },
+    {
+      "turma": "4º B",
+      "students": 1
+    },
+    {
+      "turma": "A",
+      "students": 10
+    },
+    {
+      "turma": "B",
+      "students": 12
+    },
+    {
+      "turma": "C",
+      "students": 6
+    },
+    {
+      "turma": "P 4 B",
+      "students": 1
+    },
+    {
+      "turma": "P3 A",
+      "students": 1
+    },
+    {
+      "turma": "P3C",
+      "students": 1
+    },
+    {
+      "turma": "P4",
+      "students": 1
+    },
+    {
+      "turma": "P4 - A",
+      "students": 1
+    },
+    {
+      "turma": "P4 A",
+      "students": 8
+    },
+    {
+      "turma": "P4 B",
+      "students": 5
+    },
+    {
+      "turma": "P4 C",
+      "students": 5
+    },
+    {
+      "turma": "P4-A",
+      "students": 1
+    },
+    {
+      "turma": "P4A",
+      "students": 11
+    },
+    {
+      "turma": "P4B",
+      "students": 19
+    },
+    {
+      "turma": "P4C",
+      "students": 7
+    },
+    {
+      "turma": "P4b",
+      "students": 1
+    },
+    {
+      "turma": "P4c",
+      "students": 3
+    },
+    {
+      "turma": "Todas",
+      "students": 1
+    },
+    {
+      "turma": "Turma 4 B",
+      "students": 1
+    },
+    {
+      "turma": "Turma A",
+      "students": 1
+    },
+    {
+      "turma": "Turma B",
+      "students": 4
+    },
+    {
+      "turma": "XVIII A (P4 A)",
+      "students": 1
+    },
+    {
+      "turma": "p3b",
+      "students": 1
+    }
+  ]
+}
