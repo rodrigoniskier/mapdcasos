@@ -1,5 +1,12 @@
 # MAPD Casos
 
+> **Status: ativo e em uso educacional.** Plataforma acompanhada por analytics de utilização e mantida para operação multiusuário em ambiente de recursos limitados.
+
+### Portfolio snapshot
+
+Este projeto demonstra **EdTech com IA em uso real**, combinando Django, regras pedagógicas, structured output, rate limiting, idempotência, circuit breaker, analytics e dois modos de aprendizagem — um com IA e outro totalmente determinístico. O desenho explicita a diferença entre piloto gratuito e produção multiusuário.
+
+
 Plataforma educacional de simulação clínica para estudo de infecções na Atenção Primária à Saúde (APS) do SUS, baseada no livro **Mecanismos de Agressão, Patológicos e de Defesa**, de Prof. Rodrigo Niskier Ferreira Barbosa.
 
 ## Estado atual
