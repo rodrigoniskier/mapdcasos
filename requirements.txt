@@ -1,4 +1,4 @@
-Django>=5.2,<5.3
+Django>=6.1.1,<6.2
 google-genai>=2.6,<3
 python-dotenv>=1.0,<2
 dj-database-url>=2.2,<3
