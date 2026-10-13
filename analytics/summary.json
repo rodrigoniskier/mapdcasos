@@ -1,6 +1,6 @@
 {
   "project": "MAPD Casos",
-  "generated_at": "2026-09-29T15:06:58.119540-03:00",
+  "generated_at": "2026-10-13T16:19:48.100483-03:00",
   "privacy": {
     "contains_personal_data": false,
     "contains_names": false,
@@ -13,10 +13,10 @@
     "last_use": "2026-09-29T13:09:28.857327-03:00"
   },
   "students": {
-    "registered": 118,
+    "registered": 119,
     "active": 106,
     "with_completed_case": 92,
-    "activation_rate_pct": 89.8,
+    "activation_rate_pct": 89.1,
     "completed_case_rate_pct": 86.8
   },
   "cases": {
@@ -130,7 +130,7 @@
       "best_or_suboptimal_decisions_pct": 93.1
     },
     "university_impact": {
-      "registered_students": 118,
+      "registered_students": 119,
       "active_students": 106,
       "students_with_completed_case": 92,
       "student_messages": 2238,
