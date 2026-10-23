@@ -1,6 +1,6 @@
 {
   "project": "MAPD Casos",
-  "generated_at": "2026-10-14T14:16:48.987508-03:00",
+  "generated_at": "2026-10-23T14:13:13.252090-03:00",
   "privacy": {
     "contains_personal_data": false,
     "contains_names": false,
@@ -10,14 +10,14 @@
   },
   "usage_period": {
     "first_use": "2026-08-10T14:52:22.967322-03:00",
-    "last_use": "2026-10-13T16:49:33.569011-03:00"
+    "last_use": "2026-10-23T13:03:20.721812-03:00"
   },
   "students": {
-    "registered": 122,
-    "active": 109,
-    "with_completed_case": 95,
-    "activation_rate_pct": 89.3,
-    "completed_case_rate_pct": 87.2
+    "registered": 123,
+    "active": 110,
+    "with_completed_case": 98,
+    "activation_rate_pct": 89.4,
+    "completed_case_rate_pct": 89.1
   },
   "cases": {
     "active": 80,
@@ -41,36 +41,36 @@
     ]
   },
   "encounters": {
-    "total": 465,
-    "completed": 343,
-    "completion_rate_pct": 73.8,
-    "average_score": 87.69,
+    "total": 472,
+    "completed": 347,
+    "completion_rate_pct": 73.5,
+    "average_score": 87.65,
     "by_mode": [
       {
         "mode": "AI",
         "students": 91,
-        "encounters": 267,
-        "completed": 188,
-        "average_score": 83.78,
-        "completion_rate_pct": 70.4
+        "encounters": 270,
+        "completed": 189,
+        "average_score": 83.85,
+        "completion_rate_pct": 70.0
       },
       {
         "mode": "TREE",
-        "students": 71,
-        "encounters": 198,
-        "completed": 155,
-        "average_score": 92.43,
-        "completion_rate_pct": 78.3
+        "students": 73,
+        "encounters": 202,
+        "completed": 158,
+        "average_score": 92.2,
+        "completion_rate_pct": 78.2
       }
     ],
     "by_category": [
       {
         "case__category": "BACTERIA",
-        "students": 109,
-        "encounters": 460,
-        "completed": 341,
-        "average_score": 87.68,
-        "completion_rate_pct": 74.1
+        "students": 110,
+        "encounters": 467,
+        "completed": 345,
+        "average_score": 87.64,
+        "completion_rate_pct": 73.9
       },
       {
         "case__category": "PARASITE",
@@ -91,50 +91,50 @@
     ]
   },
   "decisions": {
-    "total": 977,
+    "total": 995,
     "quality_counts": {
-      "BEST": 810,
-      "PLAUSIBLE": 38,
-      "SUBOPTIMAL": 101,
-      "WRONG": 28
+      "BEST": 823,
+      "PLAUSIBLE": 41,
+      "SUBOPTIMAL": 102,
+      "WRONG": 29
     },
     "quality_percentages": {
-      "BEST": 82.9,
-      "PLAUSIBLE": 3.9,
+      "BEST": 82.7,
+      "PLAUSIBLE": 4.1,
       "SUBOPTIMAL": 10.3,
       "WRONG": 2.9
     },
-    "best_or_suboptimal_pct": 93.2
+    "best_or_suboptimal_pct": 93.0
   },
   "award_metrics": {
     "engagement": {
-      "active_students": 109,
-      "students_with_2plus_encounters": 98,
-      "students_with_2plus_encounters_pct": 89.9,
-      "students_with_5plus_encounters": 43,
-      "students_with_5plus_encounters_pct": 39.4,
-      "students_with_2plus_completed": 81,
-      "students_with_2plus_completed_pct": 74.3,
+      "active_students": 110,
+      "students_with_2plus_encounters": 99,
+      "students_with_2plus_encounters_pct": 90.0,
+      "students_with_5plus_encounters": 44,
+      "students_with_5plus_encounters_pct": 40.0,
+      "students_with_2plus_completed": 82,
+      "students_with_2plus_completed_pct": 74.5,
       "students_with_5plus_completed": 25,
-      "students_with_5plus_completed_pct": 22.9,
-      "students_using_both_modes": 53,
-      "students_using_both_modes_pct": 48.6
+      "students_with_5plus_completed_pct": 22.7,
+      "students_using_both_modes": 54,
+      "students_using_both_modes_pct": 49.1
     },
     "measurable_benefits": {
-      "completed_encounters": 343,
-      "completion_rate_pct": 73.8,
-      "average_score": 87.69,
-      "adequate_completed_encounters": 311,
-      "adequate_completed_encounters_pct": 90.7,
-      "structured_decisions": 977,
-      "best_or_suboptimal_decisions_pct": 93.2
+      "completed_encounters": 347,
+      "completion_rate_pct": 73.5,
+      "average_score": 87.65,
+      "adequate_completed_encounters": 313,
+      "adequate_completed_encounters_pct": 90.2,
+      "structured_decisions": 995,
+      "best_or_suboptimal_decisions_pct": 93.0
     },
     "university_impact": {
-      "registered_students": 122,
-      "active_students": 109,
-      "students_with_completed_case": 95,
-      "student_messages": 2238,
-      "clinical_decisions": 977,
+      "registered_students": 123,
+      "active_students": 110,
+      "students_with_completed_case": 98,
+      "student_messages": 2269,
+      "clinical_decisions": 995,
       "distinct_cases_used": 24
     },
     "teaching_learning_contribution": {
@@ -142,7 +142,7 @@
       "active_cases": 80,
       "case_categories": 4,
       "distinct_cases_already_used": 24,
-      "student_generated_interactions": 3215
+      "student_generated_interactions": 3264
     },
     "originality": {
       "automatically_quantifiable": false,
@@ -154,15 +154,15 @@
     }
   },
   "messages": {
-    "total": 5207,
-    "student": 2238,
-    "patient": 2504,
+    "total": 5272,
+    "student": 2269,
+    "patient": 2537,
     "preceptor": 217,
     "tutor": 60,
-    "system": 188
+    "system": 189
   },
   "student_activity": {
-    "average_encounters": 4.27,
+    "average_encounters": 4.29,
     "minimum_encounters": 1,
     "maximum_encounters": 23,
     "average_completed": 3.15,
