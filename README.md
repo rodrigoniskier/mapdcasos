@@ -19,7 +19,7 @@ Plataforma educacional de simulação clínica para estudo de infecções na Ate
 
 **Tecnologias.** Python, Django, Gemini API (saída estruturada com Pydantic), PostgreSQL, SQLite, rate limiting, idempotência, circuit breaker, GitHub Actions.
 
-**Qualidade e evidências.** 40 funções de teste automatizadas; workflows de testes e de atualização de analytics; README descreve limites do piloto gratuito e requisitos de produção multiusuário.
+**Qualidade e evidências.** 40 funções de teste automatizadas; workflows de testes e de atualização de analytics; README descreve limites do piloto gratuito e requisitos de produção multiusuário. Licença MIT.
 
 ## Estado atual
 
