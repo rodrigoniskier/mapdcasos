@@ -9,6 +9,18 @@ Este projeto demonstra **EdTech com IA em uso real**, combinando Django, regras 
 
 Plataforma educacional de simulação clínica para estudo de infecções na Atenção Primária à Saúde (APS) do SUS, baseada no livro **Mecanismos de Agressão, Patológicos e de Defesa**, de Prof. Rodrigo Niskier Ferreira Barbosa.
 
+## Problema, público e resultado
+
+**Problema.** Estudantes de Medicina precisam praticar o raciocínio clínico sobre infecções na Atenção Primária à Saúde antes de atender pacientes reais.
+
+**Para quem.** Estudantes de Medicina e o professor responsável pela disciplina (cadastro por RGM e turma, com fluxo próprio de professor).
+
+**O que entrega.** Simulação clínica com 80 pacientes iniciais em quatro ambulatórios (bactérias, fungos, vírus e parasitas) e dois modos de estudo: com auxílio de IA e por árvore decisória, totalmente determinística.
+
+**Tecnologias.** Python, Django, Gemini API (saída estruturada com Pydantic), PostgreSQL, SQLite, rate limiting, idempotência, circuit breaker, GitHub Actions.
+
+**Qualidade e evidências.** 40 funções de teste automatizadas; workflows de testes e de atualização de analytics; README descreve limites do piloto gratuito e requisitos de produção multiusuário.
+
 ## Estado atual
 
 O projeto possui dois gates distintos:
